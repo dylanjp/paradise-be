@@ -33,13 +33,13 @@ public class DataInitializer implements CommandLineRunner {
 
     private void seedUsers() {
         // Seed admin users with ROLE_ADMIN and ROLE_USER
-        createUserIfNotExists("admin1", "admin1pass", Set.of("ROLE_ADMIN", "ROLE_USER"));
+        //createUserIfNotExists("admin1", "admin1pass", Set.of("ROLE_ADMIN", "ROLE_USER"));
         createUserIfNotExists("admin2", "admin2pass", Set.of("ROLE_ADMIN", "ROLE_USER"));
 
         // Seed regular users with ROLE_USER only
-        createUserIfNotExists("user1", "user1pass", Set.of("ROLE_USER"));
-        createUserIfNotExists("user2", "user2pass", Set.of("ROLE_USER"));
-        createUserIfNotExists("user3", "user3pass", Set.of("ROLE_USER"));
+        //createUserIfNotExists("user1", "user1pass", Set.of("ROLE_USER"));
+        //createUserIfNotExists("user2", "user2pass", Set.of("ROLE_USER"));
+        //createUserIfNotExists("user3", "user3pass", Set.of("ROLE_USER"));
 
         logger.info("Data seeding completed");
     }

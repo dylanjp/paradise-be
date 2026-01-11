@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.util.List;
+
 /**
  * REST controller handling all task-related HTTP endpoints.
  * Maps the base path /users/{userId}/tasks and delegates business logic to TaskService.
@@ -138,5 +141,22 @@ public class TaskController {
             @PathVariable String id) {
         taskService.deleteDailyTask(userId, id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Retrieves the completion history for a daily task.
+     * Returns all dates when the task was marked as complete, in descending order (most recent first).
+     * Returns 404 if the task doesn't exist or belongs to a different user.
+     *
+     * @param userId the unique identifier of the user from the path
+     * @param id the unique identifier of the daily task
+     * @return ResponseEntity containing list of completion dates with 200 OK status
+     */
+    @GetMapping("/daily/{id}/completions")
+    public ResponseEntity<List<LocalDate>> getDailyTaskCompletions(
+            @PathVariable String userId,
+            @PathVariable String id) {
+        List<LocalDate> completions = taskService.getCompletionHistory(userId, id);
+        return ResponseEntity.ok(completions);
     }
 }

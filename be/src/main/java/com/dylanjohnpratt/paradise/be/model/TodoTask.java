@@ -1,16 +1,31 @@
 package com.dylanjohnpratt.paradise.be.model;
 
+import jakarta.persistence.*;
+
 /**
  * Represents a persistent TODO task that belongs to a category and may have parent-child relationships.
  * TODO tasks are user-scoped and support hierarchical organization through the parentId field.
  */
+@Entity
+@Table(name = "todo_tasks")
 public class TodoTask {
+    @Id
     private String id;
+    
+    @Column(nullable = false)
     private String userId;
+    
+    @Column(nullable = false)
     private String description;
+    
     private String category;
+    
+    @Column(nullable = false)
     private boolean completed;
+    
+    @Column(name = "task_order", nullable = false)
     private int order;
+    
     private String parentId;  // null for root tasks
 
     public TodoTask() {
