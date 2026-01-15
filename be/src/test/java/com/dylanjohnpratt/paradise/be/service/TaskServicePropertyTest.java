@@ -64,6 +64,14 @@ class TaskServicePropertyTest {
         }
 
         @Override
+        public List<TodoTask> findByUserIdAndParentId(String userId, String parentId) {
+            return tasks.values().stream()
+                    .filter(t -> t.getUserId().equals(userId) && 
+                                 Objects.equals(t.getParentId(), parentId))
+                    .toList();
+        }
+
+        @Override
         public void delete(TodoTask task) {
             tasks.remove(task.getId());
         }
@@ -76,7 +84,14 @@ class TaskServicePropertyTest {
         // Unused methods for testing
         @Override public List<TodoTask> findAll() { return new ArrayList<>(tasks.values()); }
         @Override public List<TodoTask> findAllById(Iterable<String> ids) { return null; }
-        @Override public <S extends TodoTask> List<S> saveAll(Iterable<S> entities) { return null; }
+        @Override public <S extends TodoTask> List<S> saveAll(Iterable<S> entities) {
+            List<S> result = new ArrayList<>();
+            entities.forEach(entity -> {
+                tasks.put(entity.getId(), entity);
+                result.add(entity);
+            });
+            return result;
+        }
         @Override public boolean existsById(String s) { return false; }
         @Override public long count() { return 0; }
         @Override public void deleteById(String s) { }

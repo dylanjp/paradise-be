@@ -12,10 +12,17 @@ public class TodoTaskRequest {
     private Boolean completed;
     private Integer order;
     private String parentId;
+    private boolean parentIdProvided = false;
 
     public TodoTaskRequest() {
     }
 
+    /**
+     * Constructor for creating a new task with all fields.
+     * Note: This constructor sets parentIdProvided to true only if parentId is non-null.
+     * For update operations where you want to explicitly set parentId (including to null),
+     * use the default constructor and call setParentId().
+     */
     public TodoTaskRequest(String id, String description, String category, Boolean completed, Integer order, String parentId) {
         this.id = id;
         this.description = description;
@@ -23,6 +30,9 @@ public class TodoTaskRequest {
         this.completed = completed;
         this.order = order;
         this.parentId = parentId;
+        // Only mark as provided if parentId is non-null (for backward compatibility)
+        // For explicit null setting, use setParentId(null) which will set parentIdProvided = true
+        this.parentIdProvided = (parentId != null);
     }
 
     public String getId() {
@@ -71,5 +81,14 @@ public class TodoTaskRequest {
 
     public void setParentId(String parentId) {
         this.parentId = parentId;
+        this.parentIdProvided = true;
+    }
+
+    public boolean isParentIdProvided() {
+        return parentIdProvided;
+    }
+
+    public void setParentIdProvided(boolean parentIdProvided) {
+        this.parentIdProvided = parentIdProvided;
     }
 }

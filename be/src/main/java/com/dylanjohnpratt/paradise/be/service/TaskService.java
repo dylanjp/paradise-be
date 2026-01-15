@@ -106,9 +106,10 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the task to update
-     * @param request the task request containing optional description, completed, and order fields
+     * @param request the task request containing optional description, completed, order, and parentId fields
      * @return the updated TodoTask
      * @throws TaskNotFoundException if the task is not found for the specified user
+     * @throws IllegalArgumentException if the parentId is invalid
      */
     public TodoTask updateTodoTask(String userId, String taskId, TodoTaskRequest request) {
         TodoTask task = todoTaskRepository.findById(taskId)
@@ -129,7 +130,40 @@ public class TaskService {
             task.setOrder(request.getOrder());
         }
         
+        // Handle parentId update - only if field was explicitly set in request
+        if (request.isParentIdProvided()) {
+            String newParentId = request.getParentId();
+            if (newParentId != null) {
+                // Validate parent exists and belongs to same user
+                validateParentTask(userId, newParentId, taskId);
+            }
+            task.setParentId(newParentId);
+        }
+        
         return todoTaskRepository.save(task);
+    }
+
+    /**
+     * Validates that a parent task exists and belongs to the same user.
+     * Also prevents self-referencing (a task cannot be its own parent).
+     *
+     * @param userId the unique identifier of the user
+     * @param parentId the ID of the parent task to validate
+     * @param taskId the ID of the task being updated (to prevent self-referencing)
+     * @throws IllegalArgumentException if the parent task is invalid
+     */
+    private void validateParentTask(String userId, String parentId, String taskId) {
+        // Prevent self-referencing
+        if (parentId.equals(taskId)) {
+            throw new IllegalArgumentException("A task cannot be its own parent");
+        }
+        
+        TodoTask parentTask = todoTaskRepository.findById(parentId)
+                .orElseThrow(() -> new IllegalArgumentException("Parent task not found: " + parentId));
+        
+        if (!parentTask.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Parent task not found: " + parentId);
+        }
     }
 
     /**
@@ -204,14 +238,15 @@ public class TaskService {
     }
 
     /**
-     * Deletes a TODO task and all its children for the specified user.
-     * Cascade deletes all tasks that have the deleted task's id as their parentId.
+     * Deletes a TODO task for the specified user.
+     * Unnests all child tasks by setting their parentId to null (orphan prevention).
      * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
      *
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the task to delete
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
+    @Transactional
     public void deleteTodoTask(String userId, String taskId) {
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
@@ -221,16 +256,15 @@ public class TaskService {
             throw new TaskNotFoundException("TODO task not found: " + taskId);
         }
         
+        // Unnest children: set parentId to null for all child tasks (orphan prevention)
+        List<TodoTask> childTasks = todoTaskRepository.findByUserIdAndParentId(userId, taskId);
+        for (TodoTask child : childTasks) {
+            child.setParentId(null);
+        }
+        todoTaskRepository.saveAll(childTasks);
+        
         // Delete the task
         todoTaskRepository.delete(task);
-        
-        // Cascade delete: find and remove all children with matching parentId
-        List<TodoTask> allUserTasks = todoTaskRepository.findByUserId(userId);
-        List<TodoTask> childTasks = allUserTasks.stream()
-                .filter(t -> taskId.equals(t.getParentId()))
-                .collect(Collectors.toList());
-        
-        todoTaskRepository.deleteAll(childTasks);
     }
 
     /**

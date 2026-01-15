@@ -28,4 +28,14 @@ public interface TodoTaskRepository extends JpaRepository<TodoTask, String> {
      * @return list of TODO tasks for the user in the category
      */
     List<TodoTask> findByUserIdAndCategory(String userId, String category);
+    
+    /**
+     * Finds all TODO tasks for a specific user that have the given parentId.
+     * Used for finding child tasks when a parent task is deleted (orphan prevention).
+     *
+     * @param userId the user ID
+     * @param parentId the parent task ID
+     * @return list of TODO tasks that are children of the specified parent
+     */
+    List<TodoTask> findByUserIdAndParentId(String userId, String parentId);
 }
