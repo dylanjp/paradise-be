@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -67,8 +68,8 @@ class SelfPasswordChangeIntegrationTest {
         LoginRequest loginRequest = new LoginRequest(username, password);
         
         MvcResult result = mockMvc.perform(post("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(loginRequest))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -83,16 +84,16 @@ class SelfPasswordChangeIntegrationTest {
         
         mockMvc.perform(put("/users/me/password")
                 .header("Authorization", "Bearer " + userToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Password changed successfully"));
 
         // Verify new password works by logging in with it
         LoginRequest loginRequest = new LoginRequest("passworduser", "newpassword123");
         mockMvc.perform(post("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(loginRequest))))
                 .andExpect(status().isOk());
     }
 
@@ -103,8 +104,8 @@ class SelfPasswordChangeIntegrationTest {
         
         mockMvc.perform(put("/users/me/password")
                 .header("Authorization", "Bearer " + userToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Current password is incorrect"));
     }
@@ -116,8 +117,8 @@ class SelfPasswordChangeIntegrationTest {
         
         // Spring Security returns 403 for unauthenticated requests by default
         mockMvc.perform(put("/users/me/password")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isForbidden());
     }
 
@@ -129,15 +130,15 @@ class SelfPasswordChangeIntegrationTest {
         
         mockMvc.perform(put("/users/me/password")
                 .header("Authorization", "Bearer " + userToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(request))))
                 .andExpect(status().isOk());
 
         // Try to login with old password - should fail
         LoginRequest loginRequest = new LoginRequest("passworduser", "oldpassword");
         mockMvc.perform(post("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(loginRequest))))
                 .andExpect(status().isUnauthorized());
     }
 }

@@ -2,6 +2,7 @@ package com.dylanjohnpratt.paradise.be.service;
 
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -79,7 +80,7 @@ public class UserService implements UserDetailsService {
      * @throws IllegalArgumentException if user is not found
      */
     @Transactional
-    public User updateRoles(Long userId, Set<String> roles) {
+    public User updateRoles(@NonNull Long userId, Set<String> roles) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
         
@@ -95,7 +96,7 @@ public class UserService implements UserDetailsService {
      * @throws IllegalArgumentException if user is not found
      */
     @Transactional
-    public void resetPassword(Long userId, String newPassword) {
+    public void resetPassword(@NonNull Long userId, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
         
@@ -111,7 +112,7 @@ public class UserService implements UserDetailsService {
      * @throws IllegalArgumentException if user is not found
      */
     @Transactional
-    public void disableUser(Long userId) {
+    public void disableUser(@NonNull Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
         
@@ -126,7 +127,7 @@ public class UserService implements UserDetailsService {
      * @throws IllegalArgumentException if user is not found
      */
     @Transactional
-    public void deleteUser(Long userId) {
+    public void deleteUser(@NonNull Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new IllegalArgumentException("User not found with id: " + userId);
         }
@@ -163,7 +164,7 @@ public class UserService implements UserDetailsService {
      * @return the user if found
      * @throws IllegalArgumentException if user is not found
      */
-    public User findById(Long userId) {
+    public User findById(@NonNull Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
     }

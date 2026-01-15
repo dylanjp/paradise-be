@@ -6,6 +6,7 @@ import com.dylanjohnpratt.paradise.be.model.TodoTask;
 import com.dylanjohnpratt.paradise.be.service.TaskService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -85,7 +86,7 @@ public class TaskController {
     @PutMapping("/todo/{id}")
     public ResponseEntity<TodoTask> updateTodoTask(
             @PathVariable String userId,
-            @PathVariable String id,
+            @PathVariable @NonNull String id,
             @RequestBody TodoTaskRequest request) {
         TodoTask task = taskService.updateTodoTask(userId, id, request);
         return ResponseEntity.ok(task);
@@ -104,7 +105,7 @@ public class TaskController {
     @PutMapping("/daily/{id}")
     public ResponseEntity<DailyTask> updateDailyTask(
             @PathVariable String userId,
-            @PathVariable String id,
+            @PathVariable @NonNull String id,
             @RequestBody DailyTaskRequest request) {
         DailyTask task = taskService.updateDailyTask(userId, id, request);
         return ResponseEntity.ok(task);
@@ -122,7 +123,7 @@ public class TaskController {
     @DeleteMapping("/todo/{id}")
     public ResponseEntity<Void> deleteTodoTask(
             @PathVariable String userId,
-            @PathVariable String id) {
+            @PathVariable @NonNull String id) {
         taskService.deleteTodoTask(userId, id);
         return ResponseEntity.noContent().build();
     }
@@ -138,7 +139,7 @@ public class TaskController {
     @DeleteMapping("/daily/{id}")
     public ResponseEntity<Void> deleteDailyTask(
             @PathVariable String userId,
-            @PathVariable String id) {
+            @PathVariable @NonNull String id) {
         taskService.deleteDailyTask(userId, id);
         return ResponseEntity.noContent().build();
     }
@@ -155,7 +156,7 @@ public class TaskController {
     @GetMapping("/daily/{id}/completions")
     public ResponseEntity<List<LocalDate>> getDailyTaskCompletions(
             @PathVariable String userId,
-            @PathVariable String id) {
+            @PathVariable @NonNull String id) {
         List<LocalDate> completions = taskService.getCompletionHistory(userId, id);
         return ResponseEntity.ok(completions);
     }

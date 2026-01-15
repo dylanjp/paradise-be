@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
 import java.util.Set;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -75,8 +76,8 @@ class AuthorizationIntegrationTest {
         LoginRequest loginRequest = new LoginRequest(username, password);
         
         MvcResult result = mockMvc.perform(post("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(loginRequest))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -90,7 +91,7 @@ class AuthorizationIntegrationTest {
         // Admin should be able to access /admin/** endpoints - POST /admin/users creates a user
         mockMvc.perform(post("/admin/users")
                 .header("Authorization", "Bearer " + adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                 .content("{\"username\":\"newuser\",\"password\":\"pass\",\"roles\":[\"ROLE_USER\"]}"))
                 .andExpect(status().isCreated());
     }
@@ -101,7 +102,7 @@ class AuthorizationIntegrationTest {
         // Regular user should get 403 Forbidden for /admin/** endpoints
         mockMvc.perform(post("/admin/users")
                 .header("Authorization", "Bearer " + userToken)
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                 .content("{\"username\":\"newuser\",\"password\":\"pass\",\"roles\":[\"ROLE_USER\"]}"))
                 .andExpect(status().isForbidden());
     }
@@ -111,7 +112,7 @@ class AuthorizationIntegrationTest {
     void nonAuthEndpointsRequireAuthentication() throws Exception {
         // Accessing protected endpoint without token - Spring Security returns 403 by default
         mockMvc.perform(put("/users/me/password")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                 .content("{\"currentPassword\":\"test\",\"newPassword\":\"test\"}"))
                 .andExpect(status().isForbidden());
     }
@@ -123,8 +124,8 @@ class AuthorizationIntegrationTest {
         LoginRequest loginRequest = new LoginRequest("testuser", "userpass");
         
         mockMvc.perform(post("/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(loginRequest)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(loginRequest))))
                 .andExpect(status().isOk());
     }
 
@@ -134,7 +135,7 @@ class AuthorizationIntegrationTest {
         // User with ROLE_USER trying to access admin endpoint should get 403
         mockMvc.perform(put("/admin/users/1/roles")
                 .header("Authorization", "Bearer " + userToken)
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                 .content("{\"roles\":[\"ROLE_ADMIN\"]}"))
                 .andExpect(status().isForbidden());
     }
@@ -145,7 +146,7 @@ class AuthorizationIntegrationTest {
         // Spring Security returns 403 for invalid tokens by default
         mockMvc.perform(put("/users/me/password")
                 .header("Authorization", "Bearer invalid.token.here")
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                 .content("{\"currentPassword\":\"test\",\"newPassword\":\"test\"}"))
                 .andExpect(status().isForbidden());
     }
@@ -156,7 +157,7 @@ class AuthorizationIntegrationTest {
         // Spring Security returns 403 when Bearer prefix is missing
         mockMvc.perform(put("/users/me/password")
                 .header("Authorization", adminToken)
-                .contentType(MediaType.APPLICATION_JSON)
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                 .content("{\"currentPassword\":\"test\",\"newPassword\":\"test\"}"))
                 .andExpect(status().isForbidden());
     }

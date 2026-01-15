@@ -12,8 +12,12 @@ import net.jqwik.api.*;
 import net.jqwik.api.constraints.NotBlank;
 import net.jqwik.api.constraints.Size;
 
+import org.springframework.lang.NonNull;
+
 import java.time.LocalDate;
 import java.util.*;
+
+import static java.util.Objects.requireNonNull;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -38,14 +42,16 @@ class TaskServicePropertyTest {
         private final Map<String, TodoTask> tasks = new HashMap<>();
 
         @Override
-        public TodoTask save(TodoTask task) {
+        @NonNull
+        public <S extends TodoTask> S save(@NonNull S task) {
             tasks.put(task.getId(), task);
             return task;
         }
 
         @Override
-        public Optional<TodoTask> findById(String id) {
-            return Optional.ofNullable(tasks.get(id));
+        @NonNull
+        public Optional<TodoTask> findById(@NonNull String id) {
+            return requireNonNull(Optional.ofNullable(tasks.get(id)));
         }
 
         @Override
@@ -72,19 +78,19 @@ class TaskServicePropertyTest {
         }
 
         @Override
-        public void delete(TodoTask task) {
+        public void delete(@NonNull TodoTask task) {
             tasks.remove(task.getId());
         }
 
         @Override
-        public void deleteAll(Iterable<? extends TodoTask> entities) {
+        public void deleteAll(@NonNull Iterable<? extends TodoTask> entities) {
             entities.forEach(task -> tasks.remove(task.getId()));
         }
 
         // Unused methods for testing
-        @Override public List<TodoTask> findAll() { return new ArrayList<>(tasks.values()); }
-        @Override public List<TodoTask> findAllById(Iterable<String> ids) { return null; }
-        @Override public <S extends TodoTask> List<S> saveAll(Iterable<S> entities) {
+        @Override @NonNull public List<TodoTask> findAll() { return new ArrayList<>(tasks.values()); }
+        @Override @NonNull public List<TodoTask> findAllById(@NonNull Iterable<String> ids) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends TodoTask> List<S> saveAll(@NonNull Iterable<S> entities) {
             List<S> result = new ArrayList<>();
             entities.forEach(entity -> {
                 tasks.put(entity.getId(), entity);
@@ -92,29 +98,29 @@ class TaskServicePropertyTest {
             });
             return result;
         }
-        @Override public boolean existsById(String s) { return false; }
+        @Override public boolean existsById(@NonNull String s) { return false; }
         @Override public long count() { return 0; }
-        @Override public void deleteById(String s) { }
-        @Override public void deleteAllById(Iterable<? extends String> ids) { }
+        @Override public void deleteById(@NonNull String s) { }
+        @Override public void deleteAllById(@NonNull Iterable<? extends String> ids) { }
         @Override public void deleteAll() { }
         @Override public void flush() { }
-        @Override public <S extends TodoTask> S saveAndFlush(S entity) { return null; }
-        @Override public <S extends TodoTask> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
-        @Override public void deleteAllInBatch(Iterable<TodoTask> entities) { }
-        @Override public void deleteAllByIdInBatch(Iterable<String> ids) { }
+        @Override @NonNull public <S extends TodoTask> S saveAndFlush(@NonNull S entity) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends TodoTask> List<S> saveAllAndFlush(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public void deleteAllInBatch(@NonNull Iterable<TodoTask> entities) { }
+        @Override public void deleteAllByIdInBatch(@NonNull Iterable<String> ids) { }
         @Override public void deleteAllInBatch() { }
-        @Override public TodoTask getOne(String s) { return null; }
-        @Override public TodoTask getById(String s) { return null; }
-        @Override public TodoTask getReferenceById(String s) { return null; }
-        @Override public <S extends TodoTask> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
-        @Override public <S extends TodoTask> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
-        @Override public <S extends TodoTask> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
-        @Override public <S extends TodoTask> org.springframework.data.domain.Page<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Pageable pageable) { return null; }
-        @Override public <S extends TodoTask> long count(org.springframework.data.domain.Example<S> example) { return 0; }
-        @Override public <S extends TodoTask> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
-        @Override public <S extends TodoTask, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
-        @Override public List<TodoTask> findAll(org.springframework.data.domain.Sort sort) { return null; }
-        @Override public org.springframework.data.domain.Page<TodoTask> findAll(org.springframework.data.domain.Pageable pageable) { return null; }
+        @Override @NonNull public TodoTask getOne(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public TodoTask getById(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public TodoTask getReferenceById(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends TodoTask> Optional<S> findOne(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(Optional.empty()); }
+        @Override @NonNull public <S extends TodoTask> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends TodoTask> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends TodoTask> org.springframework.data.domain.Page<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
+        @Override public <S extends TodoTask> long count(@NonNull org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends TodoTask> boolean exists(@NonNull org.springframework.data.domain.Example<S> example) { return false; }
+        @Override @NonNull public <S extends TodoTask, R> R findBy(@NonNull org.springframework.data.domain.Example<S> example, @NonNull java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public List<TodoTask> findAll(@NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public org.springframework.data.domain.Page<TodoTask> findAll(@NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
     }
 
     /**
@@ -124,14 +130,16 @@ class TaskServicePropertyTest {
         private final Map<String, DailyTask> tasks = new HashMap<>();
 
         @Override
-        public DailyTask save(DailyTask task) {
+        @NonNull
+        public <S extends DailyTask> S save(@NonNull S task) {
             tasks.put(task.getId(), task);
             return task;
         }
 
         @Override
-        public Optional<DailyTask> findById(String id) {
-            return Optional.ofNullable(tasks.get(id));
+        @NonNull
+        public Optional<DailyTask> findById(@NonNull String id) {
+            return requireNonNull(Optional.ofNullable(tasks.get(id)));
         }
 
         @Override
@@ -142,38 +150,38 @@ class TaskServicePropertyTest {
         }
 
         @Override
-        public void delete(DailyTask task) {
+        public void delete(@NonNull DailyTask task) {
             tasks.remove(task.getId());
         }
 
         // Unused methods for testing
-        @Override public List<DailyTask> findAll() { return new ArrayList<>(tasks.values()); }
-        @Override public List<DailyTask> findAllById(Iterable<String> ids) { return null; }
-        @Override public <S extends DailyTask> List<S> saveAll(Iterable<S> entities) { return null; }
-        @Override public boolean existsById(String s) { return false; }
+        @Override @NonNull public List<DailyTask> findAll() { return new ArrayList<>(tasks.values()); }
+        @Override @NonNull public List<DailyTask> findAllById(@NonNull Iterable<String> ids) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends DailyTask> List<S> saveAll(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public boolean existsById(@NonNull String s) { return false; }
         @Override public long count() { return 0; }
-        @Override public void deleteById(String s) { }
-        @Override public void deleteAll(Iterable<? extends DailyTask> entities) { }
-        @Override public void deleteAllById(Iterable<? extends String> ids) { }
+        @Override public void deleteById(@NonNull String s) { }
+        @Override public void deleteAll(@NonNull Iterable<? extends DailyTask> entities) { }
+        @Override public void deleteAllById(@NonNull Iterable<? extends String> ids) { }
         @Override public void deleteAll() { }
         @Override public void flush() { }
-        @Override public <S extends DailyTask> S saveAndFlush(S entity) { return null; }
-        @Override public <S extends DailyTask> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
-        @Override public void deleteAllInBatch(Iterable<DailyTask> entities) { }
-        @Override public void deleteAllByIdInBatch(Iterable<String> ids) { }
+        @Override @NonNull public <S extends DailyTask> S saveAndFlush(@NonNull S entity) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends DailyTask> List<S> saveAllAndFlush(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public void deleteAllInBatch(@NonNull Iterable<DailyTask> entities) { }
+        @Override public void deleteAllByIdInBatch(@NonNull Iterable<String> ids) { }
         @Override public void deleteAllInBatch() { }
-        @Override public DailyTask getOne(String s) { return null; }
-        @Override public DailyTask getById(String s) { return null; }
-        @Override public DailyTask getReferenceById(String s) { return null; }
-        @Override public <S extends DailyTask> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
-        @Override public <S extends DailyTask> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
-        @Override public <S extends DailyTask> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
-        @Override public <S extends DailyTask> org.springframework.data.domain.Page<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Pageable pageable) { return null; }
-        @Override public <S extends DailyTask> long count(org.springframework.data.domain.Example<S> example) { return 0; }
-        @Override public <S extends DailyTask> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
-        @Override public <S extends DailyTask, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
-        @Override public List<DailyTask> findAll(org.springframework.data.domain.Sort sort) { return null; }
-        @Override public org.springframework.data.domain.Page<DailyTask> findAll(org.springframework.data.domain.Pageable pageable) { return null; }
+        @Override @NonNull public DailyTask getOne(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public DailyTask getById(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public DailyTask getReferenceById(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends DailyTask> Optional<S> findOne(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(Optional.empty()); }
+        @Override @NonNull public <S extends DailyTask> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends DailyTask> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends DailyTask> org.springframework.data.domain.Page<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
+        @Override public <S extends DailyTask> long count(@NonNull org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends DailyTask> boolean exists(@NonNull org.springframework.data.domain.Example<S> example) { return false; }
+        @Override @NonNull public <S extends DailyTask, R> R findBy(@NonNull org.springframework.data.domain.Example<S> example, @NonNull java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public List<DailyTask> findAll(@NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public org.springframework.data.domain.Page<DailyTask> findAll(@NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
     }
 
     /**
@@ -184,7 +192,8 @@ class TaskServicePropertyTest {
         private int idCounter = 0;
 
         @Override
-        public DailyTaskCompletion save(DailyTaskCompletion completion) {
+        @NonNull
+        public <S extends DailyTaskCompletion> S save(@NonNull S completion) {
             if (completion.getId() == null) {
                 completion.setId("completion-" + (++idCounter));
             }
@@ -220,39 +229,40 @@ class TaskServicePropertyTest {
         }
 
         @Override
-        public Optional<DailyTaskCompletion> findById(String id) {
-            return Optional.ofNullable(completions.get(id));
+        @NonNull
+        public Optional<DailyTaskCompletion> findById(@NonNull String id) {
+            return requireNonNull(Optional.ofNullable(completions.get(id)));
         }
 
         // Unused methods for testing
-        @Override public List<DailyTaskCompletion> findAll() { return new ArrayList<>(completions.values()); }
-        @Override public List<DailyTaskCompletion> findAllById(Iterable<String> ids) { return null; }
-        @Override public <S extends DailyTaskCompletion> List<S> saveAll(Iterable<S> entities) { return null; }
-        @Override public boolean existsById(String s) { return false; }
+        @Override @NonNull public List<DailyTaskCompletion> findAll() { return new ArrayList<>(completions.values()); }
+        @Override @NonNull public List<DailyTaskCompletion> findAllById(@NonNull Iterable<String> ids) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends DailyTaskCompletion> List<S> saveAll(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public boolean existsById(@NonNull String s) { return false; }
         @Override public long count() { return 0; }
-        @Override public void deleteById(String s) { }
-        @Override public void delete(DailyTaskCompletion entity) { completions.remove(entity.getId()); }
-        @Override public void deleteAll(Iterable<? extends DailyTaskCompletion> entities) { }
-        @Override public void deleteAllById(Iterable<? extends String> ids) { }
+        @Override public void deleteById(@NonNull String s) { }
+        @Override public void delete(@NonNull DailyTaskCompletion entity) { completions.remove(entity.getId()); }
+        @Override public void deleteAll(@NonNull Iterable<? extends DailyTaskCompletion> entities) { }
+        @Override public void deleteAllById(@NonNull Iterable<? extends String> ids) { }
         @Override public void deleteAll() { }
         @Override public void flush() { }
-        @Override public <S extends DailyTaskCompletion> S saveAndFlush(S entity) { return null; }
-        @Override public <S extends DailyTaskCompletion> List<S> saveAllAndFlush(Iterable<S> entities) { return null; }
-        @Override public void deleteAllInBatch(Iterable<DailyTaskCompletion> entities) { }
-        @Override public void deleteAllByIdInBatch(Iterable<String> ids) { }
+        @Override @NonNull public <S extends DailyTaskCompletion> S saveAndFlush(@NonNull S entity) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends DailyTaskCompletion> List<S> saveAllAndFlush(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public void deleteAllInBatch(@NonNull Iterable<DailyTaskCompletion> entities) { }
+        @Override public void deleteAllByIdInBatch(@NonNull Iterable<String> ids) { }
         @Override public void deleteAllInBatch() { }
-        @Override public DailyTaskCompletion getOne(String s) { return null; }
-        @Override public DailyTaskCompletion getById(String s) { return null; }
-        @Override public DailyTaskCompletion getReferenceById(String s) { return null; }
-        @Override public <S extends DailyTaskCompletion> Optional<S> findOne(org.springframework.data.domain.Example<S> example) { return Optional.empty(); }
-        @Override public <S extends DailyTaskCompletion> List<S> findAll(org.springframework.data.domain.Example<S> example) { return null; }
-        @Override public <S extends DailyTaskCompletion> List<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Sort sort) { return null; }
-        @Override public <S extends DailyTaskCompletion> org.springframework.data.domain.Page<S> findAll(org.springframework.data.domain.Example<S> example, org.springframework.data.domain.Pageable pageable) { return null; }
-        @Override public <S extends DailyTaskCompletion> long count(org.springframework.data.domain.Example<S> example) { return 0; }
-        @Override public <S extends DailyTaskCompletion> boolean exists(org.springframework.data.domain.Example<S> example) { return false; }
-        @Override public <S extends DailyTaskCompletion, R> R findBy(org.springframework.data.domain.Example<S> example, java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { return null; }
-        @Override public List<DailyTaskCompletion> findAll(org.springframework.data.domain.Sort sort) { return null; }
-        @Override public org.springframework.data.domain.Page<DailyTaskCompletion> findAll(org.springframework.data.domain.Pageable pageable) { return null; }
+        @Override @NonNull public DailyTaskCompletion getOne(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public DailyTaskCompletion getById(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public DailyTaskCompletion getReferenceById(@NonNull String s) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends DailyTaskCompletion> Optional<S> findOne(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(Optional.empty()); }
+        @Override @NonNull public <S extends DailyTaskCompletion> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends DailyTaskCompletion> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends DailyTaskCompletion> org.springframework.data.domain.Page<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
+        @Override public <S extends DailyTaskCompletion> long count(@NonNull org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends DailyTaskCompletion> boolean exists(@NonNull org.springframework.data.domain.Example<S> example) { return false; }
+        @Override @NonNull public <S extends DailyTaskCompletion, R> R findBy(@NonNull org.springframework.data.domain.Example<S> example, @NonNull java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public List<DailyTaskCompletion> findAll(@NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public org.springframework.data.domain.Page<DailyTaskCompletion> findAll(@NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
     }
 
     /**
@@ -353,7 +363,7 @@ class TaskServicePropertyTest {
         TodoTaskRequest updateRequest = new TodoTaskRequest(
                 null, newDescription, null, newCompleted, newOrder, null
         );
-        TodoTask updated = service.updateTodoTask(userId, taskId, updateRequest);
+        TodoTask updated = service.updateTodoTask(userId, requireNonNull(taskId), updateRequest);
         
         // Verify updated fields changed
         assertThat(updated.getDescription()).isEqualTo(newDescription);
@@ -399,7 +409,7 @@ class TaskServicePropertyTest {
         DailyTaskRequest updateRequest = new DailyTaskRequest(
                 null, newDescription, newCompleted, newOrder
         );
-        DailyTask updated = service.updateDailyTask(userId, taskId, updateRequest);
+        DailyTask updated = service.updateDailyTask(userId, requireNonNull(taskId), updateRequest);
         
         // Verify updated fields changed
         assertThat(updated.getDescription()).isEqualTo(newDescription);
@@ -465,22 +475,22 @@ class TaskServicePropertyTest {
         TodoTaskRequest updateTodoRequest = new TodoTaskRequest(
                 null, "modified", null, true, 999, null
         );
-        assertThatThrownBy(() -> service.updateTodoTask(user2Id, todoTaskId, updateTodoRequest))
+        assertThatThrownBy(() -> service.updateTodoTask(user2Id, requireNonNull(todoTaskId), updateTodoRequest))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User2 cannot update User1's Daily task
         DailyTaskRequest updateDailyRequest = new DailyTaskRequest(
                 null, "modified", true, 999
         );
-        assertThatThrownBy(() -> service.updateDailyTask(user2Id, dailyTaskId, updateDailyRequest))
+        assertThatThrownBy(() -> service.updateDailyTask(user2Id, requireNonNull(dailyTaskId), updateDailyRequest))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User2 cannot delete User1's TODO task
-        assertThatThrownBy(() -> service.deleteTodoTask(user2Id, todoTaskId))
+        assertThatThrownBy(() -> service.deleteTodoTask(user2Id, requireNonNull(todoTaskId)))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User2 cannot delete User1's Daily task
-        assertThatThrownBy(() -> service.deleteDailyTask(user2Id, dailyTaskId))
+        assertThatThrownBy(() -> service.deleteDailyTask(user2Id, requireNonNull(dailyTaskId)))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User1's tasks are still intact after User2's failed attempts
@@ -541,7 +551,7 @@ class TaskServicePropertyTest {
         }
         
         // Get completion history
-        List<LocalDate> history = testService.getCompletionHistory(userId, taskId);
+        List<LocalDate> history = testService.getCompletionHistory(userId, requireNonNull(taskId));
         
         // Verify all dates are returned
         assertThat(history).containsExactlyInAnyOrderElementsOf(expectedDates);
@@ -575,7 +585,7 @@ class TaskServicePropertyTest {
         service.createDailyTask(userId, createRequest);
         
         // Get completion history
-        List<LocalDate> history = service.getCompletionHistory(userId, taskId);
+        List<LocalDate> history = service.getCompletionHistory(userId, requireNonNull(taskId));
         
         // Verify empty list is returned
         assertThat(history).isEmpty();

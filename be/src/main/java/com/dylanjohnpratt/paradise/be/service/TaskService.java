@@ -8,6 +8,7 @@ import com.dylanjohnpratt.paradise.be.model.TodoTask;
 import com.dylanjohnpratt.paradise.be.repository.DailyTaskCompletionRepository;
 import com.dylanjohnpratt.paradise.be.repository.DailyTaskRepository;
 import com.dylanjohnpratt.paradise.be.repository.TodoTaskRepository;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,7 +112,7 @@ public class TaskService {
      * @throws TaskNotFoundException if the task is not found for the specified user
      * @throws IllegalArgumentException if the parentId is invalid
      */
-    public TodoTask updateTodoTask(String userId, String taskId, TodoTaskRequest request) {
+    public TodoTask updateTodoTask(String userId, @NonNull String taskId, TodoTaskRequest request) {
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
         
@@ -180,7 +181,7 @@ public class TaskService {
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
     @Transactional
-    public DailyTask updateDailyTask(String userId, String taskId, DailyTaskRequest request) {
+    public DailyTask updateDailyTask(String userId, @NonNull String taskId, DailyTaskRequest request) {
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
         
@@ -247,7 +248,7 @@ public class TaskService {
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
     @Transactional
-    public void deleteTodoTask(String userId, String taskId) {
+    public void deleteTodoTask(String userId, @NonNull String taskId) {
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
         
@@ -261,7 +262,9 @@ public class TaskService {
         for (TodoTask child : childTasks) {
             child.setParentId(null);
         }
-        todoTaskRepository.saveAll(childTasks);
+        if (!childTasks.isEmpty()) {
+            todoTaskRepository.saveAll(childTasks);
+        }
         
         // Delete the task
         todoTaskRepository.delete(task);
@@ -277,7 +280,7 @@ public class TaskService {
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
     @Transactional
-    public void deleteDailyTask(String userId, String taskId) {
+    public void deleteDailyTask(String userId, @NonNull String taskId) {
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
         
@@ -302,7 +305,7 @@ public class TaskService {
      * @return list of completion dates in descending order, or empty list if no completions exist
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
-    public List<LocalDate> getCompletionHistory(String userId, String taskId) {
+    public List<LocalDate> getCompletionHistory(String userId, @NonNull String taskId) {
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
         

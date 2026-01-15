@@ -5,7 +5,7 @@ import com.dylanjohnpratt.paradise.be.dto.LoginRequest;
 import com.dylanjohnpratt.paradise.be.model.User;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,7 +34,7 @@ public class AuthService {
      * @return AuthResponse containing the JWT token, username, and roles
      */
     public AuthResponse login(LoginRequest request) {
-        Authentication authentication = authenticationManager.authenticate(
+        authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
         

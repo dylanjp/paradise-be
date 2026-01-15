@@ -7,6 +7,7 @@ import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -76,7 +77,7 @@ public class UserAdminController {
      * @return the updated user
      */
     @PutMapping("/{id}/roles")
-    public ResponseEntity<?> updateRoles(@PathVariable Long id, @RequestBody UpdateRolesRequest request) {
+    public ResponseEntity<?> updateRoles(@PathVariable @NonNull Long id, @RequestBody UpdateRolesRequest request) {
         try {
             User user = userService.updateRoles(id, request.roles());
             return ResponseEntity.ok(Map.of(
@@ -99,7 +100,7 @@ public class UserAdminController {
      * @return success message
      */
     @PutMapping("/{id}/password")
-    public ResponseEntity<?> resetPassword(@PathVariable Long id, @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<?> resetPassword(@PathVariable @NonNull Long id, @RequestBody ResetPasswordRequest request) {
         try {
             userService.resetPassword(id, request.newPassword());
             return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
@@ -116,7 +117,7 @@ public class UserAdminController {
      * @return success message
      */
     @PutMapping("/{id}/disable")
-    public ResponseEntity<?> disableUser(@PathVariable Long id) {
+    public ResponseEntity<?> disableUser(@PathVariable @NonNull Long id) {
         try {
             userService.disableUser(id);
             return ResponseEntity.ok(Map.of("message", "User disabled successfully"));
@@ -133,7 +134,7 @@ public class UserAdminController {
      * @return no content on success
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<?> deleteUser(@PathVariable @NonNull Long id) {
         try {
             userService.deleteUser(id);
             return ResponseEntity.noContent().build();
