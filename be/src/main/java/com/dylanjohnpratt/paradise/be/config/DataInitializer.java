@@ -5,13 +5,18 @@ import com.dylanjohnpratt.paradise.be.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
 
 /**
  * Data initializer component that seeds initial users on application startup.
- * Creates admin and regular users if they do not already exist.
+ * Creates an admin user only if the database is empty.
+ * Falls back to in-memory user if database connection fails.
  */
 @Component
 public class DataInitializer implements CommandLineRunner {
@@ -20,10 +25,15 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserService userService;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final InMemoryUserDetailsManager inMemoryUserDetailsManager;
 
-    public DataInitializer(UserService userService, UserRepository userRepository) {
+    public DataInitializer(UserService userService, UserRepository userRepository,
+                           PasswordEncoder passwordEncoder, InMemoryUserDetailsManager inMemoryUserDetailsManager) {
         this.userService = userService;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.inMemoryUserDetailsManager = inMemoryUserDetailsManager;
     }
 
     @Override
@@ -32,24 +42,32 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedUsers() {
-        // Seed admin users with ROLE_ADMIN and ROLE_USER
-        //createUserIfNotExists("admin1", "admin1pass", Set.of("ROLE_ADMIN", "ROLE_USER"));
-        createUserIfNotExists("admin2", "admin2pass", Set.of("ROLE_ADMIN", "ROLE_USER"));
-
-        // Seed regular users with ROLE_USER only
-        //createUserIfNotExists("user1", "user1pass", Set.of("ROLE_USER"));
-        //createUserIfNotExists("user2", "user2pass", Set.of("ROLE_USER"));
-        //createUserIfNotExists("user3", "user3pass", Set.of("ROLE_USER"));
-
-        logger.info("Data seeding completed");
+        try {
+            long userCount = userRepository.count();
+            
+            if (userCount == 0) {
+                // Database is empty, create the initial admin user
+                userService.createUser("admin", "adminpass", Set.of("ROLE_ADMIN", "ROLE_USER"));
+                logger.info("Created initial admin user in database");
+            } else {
+                logger.info("Database already has {} user(s), skipping seed", userCount);
+            }
+            
+            logger.info("Data seeding completed");
+        } catch (Exception e) {
+            logger.warn("Database connection failed, falling back to in-memory user: {}", e.getMessage());
+            createInMemoryFallbackUser();
+        }
     }
 
-    private void createUserIfNotExists(String username, String password, Set<String> roles) {
-        if (!userRepository.existsByUsername(username)) {
-            userService.createUser(username, password, roles);
-            logger.info("Created user: {} with roles: {}", username, roles);
-        } else {
-            logger.debug("User {} already exists, skipping", username);
-        }
+    private void createInMemoryFallbackUser() {
+        UserDetails fallbackAdmin = User.builder()
+                .username("admin")
+                .password(passwordEncoder.encode("adminpass"))
+                .roles("ADMIN", "USER")
+                .build();
+        
+        inMemoryUserDetailsManager.createUser(fallbackAdmin);
+        logger.info("Created in-memory fallback admin user");
     }
 }

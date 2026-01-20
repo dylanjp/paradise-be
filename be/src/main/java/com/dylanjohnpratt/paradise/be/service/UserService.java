@@ -2,6 +2,7 @@ package com.dylanjohnpratt.paradise.be.service;
 
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
+import org.springframework.context.annotation.Primary;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -18,6 +19,7 @@ import java.util.Set;
  * Implements UserDetailsService for Spring Security integration.
  */
 @Service
+@Primary
 public class UserService implements UserDetailsService {
 
     private final UserRepository userRepository;
