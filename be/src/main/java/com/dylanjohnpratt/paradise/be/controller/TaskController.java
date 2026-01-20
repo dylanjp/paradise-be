@@ -160,4 +160,32 @@ public class TaskController {
         List<LocalDate> completions = taskService.getCompletionHistory(userId, id);
         return ResponseEntity.ok(completions);
     }
+
+    /**
+     * Retrieves all "perfect days" for the specified user in a given year.
+     * A perfect day is a date where the user completed ALL daily tasks that existed on that date.
+     * Returns dates in descending order (most recent first).
+     *
+     * @param userId the unique identifier of the user from the path
+     * @param year the year to retrieve perfect days for (optional, defaults to current year)
+     * @return ResponseEntity containing list of perfect day dates with 200 OK status
+     *         or 400 Bad Request if year is invalid
+     */
+    @GetMapping("/daily/perfect-days")
+    public ResponseEntity<List<LocalDate>> getPerfectDays(
+            @PathVariable String userId,
+            @RequestParam(required = false) Integer year) {
+        
+        // Default to current year if not provided (Requirement 1.5)
+        int targetYear = (year != null) ? year : LocalDate.now().getYear();
+        
+        // Validate year is within reasonable range (Requirement 1.7)
+        int currentYear = LocalDate.now().getYear();
+        if (targetYear < 2000 || targetYear > currentYear + 1) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        List<LocalDate> perfectDays = taskService.getPerfectDays(userId, targetYear);
+        return ResponseEntity.ok(perfectDays);
+    }
 }

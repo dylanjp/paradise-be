@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static java.util.Objects.requireNonNull;
+import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -149,6 +150,22 @@ class DailyTaskResetSchedulerPropertyTest {
         @NonNull
         public Optional<DailyTaskCompletion> findById(@NonNull String id) {
             return requireNonNull(Optional.ofNullable(completions.get(id)));
+        }
+
+        @Override
+        public List<DailyTaskCompletion> findByDailyTaskIdIn(Collection<String> dailyTaskIds) {
+            return completions.values().stream()
+                    .filter(c -> dailyTaskIds.contains(c.getDailyTaskId()))
+                    .toList();
+        }
+
+        @Override
+        public List<DailyTaskCompletion> findByDailyTaskIdInAndCompletionDateBetween(
+                Collection<String> dailyTaskIds, LocalDate startDate, LocalDate endDate) {
+            return completions.values().stream()
+                    .filter(c -> dailyTaskIds.contains(c.getDailyTaskId()))
+                    .filter(c -> !c.getCompletionDate().isBefore(startDate) && !c.getCompletionDate().isAfter(endDate))
+                    .toList();
         }
 
         @Override

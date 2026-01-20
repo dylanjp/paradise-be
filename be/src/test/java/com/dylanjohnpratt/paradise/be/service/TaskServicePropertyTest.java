@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static java.util.Objects.requireNonNull;
+import java.util.Collection;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -232,6 +233,22 @@ class TaskServicePropertyTest {
         @NonNull
         public Optional<DailyTaskCompletion> findById(@NonNull String id) {
             return requireNonNull(Optional.ofNullable(completions.get(id)));
+        }
+
+        @Override
+        public List<DailyTaskCompletion> findByDailyTaskIdIn(Collection<String> dailyTaskIds) {
+            return completions.values().stream()
+                    .filter(c -> dailyTaskIds.contains(c.getDailyTaskId()))
+                    .toList();
+        }
+
+        @Override
+        public List<DailyTaskCompletion> findByDailyTaskIdInAndCompletionDateBetween(
+                Collection<String> dailyTaskIds, LocalDate startDate, LocalDate endDate) {
+            return completions.values().stream()
+                    .filter(c -> dailyTaskIds.contains(c.getDailyTaskId()))
+                    .filter(c -> !c.getCompletionDate().isBefore(startDate) && !c.getCompletionDate().isAfter(endDate))
+                    .toList();
         }
 
         // Unused methods for testing
@@ -589,5 +606,115 @@ class TaskServicePropertyTest {
         
         // Verify empty list is returned
         assertThat(history).isEmpty();
+    }
+
+    /**
+     * Feature: perfect-days, Property 3: User Isolation
+     * For any two users with different daily tasks and completion records, calling getPerfectDays
+     * for one user SHALL never include dates influenced by the other user's tasks or completions.
+     * 
+     * Validates: Requirements 3.1, 3.2
+     */
+    @Property(tries = 100)
+    @Label("Feature: perfect-days, Property 3: User Isolation")
+    void perfectDaysUserIsolation(
+            @ForAll @NotBlank @Size(max = 50) String user1Id,
+            @ForAll @NotBlank @Size(max = 50) String user2Id,
+            @ForAll @NotBlank @Size(max = 50) String user1TaskId,
+            @ForAll @NotBlank @Size(max = 50) String user2TaskId,
+            @ForAll @NotBlank @Size(max = 200) String description,
+            @ForAll("validYear") int year
+    ) {
+        // Skip if users are the same (we need distinct users for isolation test)
+        Assume.that(!user1Id.equals(user2Id));
+        // Skip if task IDs are the same (to avoid conflicts)
+        Assume.that(!user1TaskId.equals(user2TaskId));
+        
+        // Create fresh repositories for this test
+        InMemoryDailyTaskCompletionRepository completionRepo = new InMemoryDailyTaskCompletionRepository();
+        InMemoryDailyTaskRepository dailyRepo = new InMemoryDailyTaskRepository();
+        InMemoryTodoTaskRepository todoRepo = new InMemoryTodoTaskRepository();
+        TaskService service = new TaskService(todoRepo, dailyRepo, completionRepo);
+        
+        // Create a date within the test year that is in the past or today
+        LocalDate today = LocalDate.now();
+        LocalDate testDate;
+        if (year == today.getYear()) {
+            testDate = today;
+        } else if (year < today.getYear()) {
+            testDate = LocalDate.of(year, 6, 15); // Mid-year date for past years
+        } else {
+            // Future year - skip this test case
+            Assume.that(year <= today.getYear());
+            return;
+        }
+        
+        // User1 creates a daily task with createdAt before the test date
+        DailyTask user1Task = new DailyTask(
+                user1TaskId,
+                user1Id,
+                description,
+                false,
+                0,
+                testDate.minusDays(10).atStartOfDay() // Created 10 days before test date
+        );
+        dailyRepo.save(user1Task);
+        
+        // User2 creates a daily task with createdAt before the test date
+        DailyTask user2Task = new DailyTask(
+                user2TaskId,
+                user2Id,
+                description,
+                false,
+                0,
+                testDate.minusDays(10).atStartOfDay() // Created 10 days before test date
+        );
+        dailyRepo.save(user2Task);
+        
+        // User1 completes their task on the test date (creating a perfect day for User1)
+        DailyTaskCompletion user1Completion = new DailyTaskCompletion(user1TaskId, testDate);
+        completionRepo.save(user1Completion);
+        
+        // User2 does NOT complete their task (no perfect day for User2)
+        
+        // Get perfect days for User1 - should include testDate
+        List<LocalDate> user1PerfectDays = service.getPerfectDays(user1Id, year);
+        
+        // Get perfect days for User2 - should be empty (task not completed)
+        List<LocalDate> user2PerfectDays = service.getPerfectDays(user2Id, year);
+        
+        // Verify User1 has the perfect day
+        assertThat(user1PerfectDays)
+                .as("User1 should have testDate as a perfect day")
+                .contains(testDate);
+        
+        // Verify User2 does NOT have any perfect days (their task was not completed)
+        assertThat(user2PerfectDays)
+                .as("User2 should have no perfect days since their task was not completed")
+                .isEmpty();
+        
+        // Additional verification: User1's perfect days should not be affected by User2's data
+        // Now let's have User2 complete their task and verify User1's results don't change
+        DailyTaskCompletion user2Completion = new DailyTaskCompletion(user2TaskId, testDate);
+        completionRepo.save(user2Completion);
+        
+        // Re-check User1's perfect days - should still be the same
+        List<LocalDate> user1PerfectDaysAfter = service.getPerfectDays(user1Id, year);
+        assertThat(user1PerfectDaysAfter)
+                .as("User1's perfect days should not change when User2 completes their task")
+                .containsExactlyElementsOf(user1PerfectDays);
+        
+        // Now User2 should have a perfect day
+        List<LocalDate> user2PerfectDaysAfter = service.getPerfectDays(user2Id, year);
+        assertThat(user2PerfectDaysAfter)
+                .as("User2 should now have testDate as a perfect day")
+                .contains(testDate);
+    }
+
+    @Provide
+    Arbitrary<Integer> validYear() {
+        int currentYear = LocalDate.now().getYear();
+        // Generate years from 2020 to current year (reasonable range for testing)
+        return Arbitraries.integers().between(2020, currentYear);
     }
 }

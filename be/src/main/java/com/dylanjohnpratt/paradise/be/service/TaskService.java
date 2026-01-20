@@ -321,4 +321,84 @@ public class TaskService {
                 .map(DailyTaskCompletion::getCompletionDate)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Retrieves all "perfect days" for a user in a specific year.
+     * A perfect day is a date where the user completed ALL daily tasks that existed on that date.
+     * Only considers tasks that existed on or before each candidate date (based on createdAt timestamp).
+     *
+     * @param userId the unique identifier of the user
+     * @param year the year to retrieve perfect days for
+     * @return list of perfect day dates in descending order (most recent first), or empty list if none
+     */
+    public List<LocalDate> getPerfectDays(String userId, int year) {
+        // Fetch all daily tasks for the user
+        List<DailyTask> userDailyTasks = dailyTaskRepository.findByUserId(userId);
+        
+        // Return empty list if no tasks exist (Requirement 1.2)
+        if (userDailyTasks.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        // Calculate date range for the year
+        LocalDate startDate = LocalDate.of(year, 1, 1);
+        LocalDate endDate;
+        LocalDate today = LocalDate.now();
+        if (year == today.getYear()) {
+            // For current year, only consider up to today
+            endDate = today;
+        } else {
+            endDate = LocalDate.of(year, 12, 31);
+        }
+        
+        // Get all task IDs
+        List<String> taskIds = userDailyTasks.stream()
+                .map(DailyTask::getId)
+                .collect(Collectors.toList());
+        
+        // Fetch completion records within date range
+        List<DailyTaskCompletion> completions = dailyTaskCompletionRepository
+                .findByDailyTaskIdInAndCompletionDateBetween(taskIds, startDate, endDate);
+        
+        // Return empty list if no completions exist (Requirement 1.3)
+        if (completions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        // Group completions by date
+        Map<LocalDate, Set<String>> completionsByDate = completions.stream()
+                .collect(Collectors.groupingBy(
+                        DailyTaskCompletion::getCompletionDate,
+                        Collectors.mapping(DailyTaskCompletion::getDailyTaskId, Collectors.toSet())
+                ));
+        
+        List<LocalDate> perfectDays = new ArrayList<>();
+        
+        // For each date with completions, check if all applicable tasks were completed
+        for (Map.Entry<LocalDate, Set<String>> entry : completionsByDate.entrySet()) {
+            LocalDate date = entry.getKey();
+            Set<String> completedTaskIds = entry.getValue();
+            
+            // Determine which tasks existed on that date (createdAt <= date) (Requirement 2.1, 2.2)
+            Set<String> applicableTaskIds = userDailyTasks.stream()
+                    .filter(task -> !task.getCreatedAt().toLocalDate().isAfter(date))
+                    .map(DailyTask::getId)
+                    .collect(Collectors.toSet());
+            
+            // If no tasks existed on this date, skip it
+            if (applicableTaskIds.isEmpty()) {
+                continue;
+            }
+            
+            // Check if all applicable tasks have completions for this date
+            if (completedTaskIds.containsAll(applicableTaskIds)) {
+                perfectDays.add(date);
+            }
+        }
+        
+        // Sort results descending (most recent first) (Requirement 1.6)
+        perfectDays.sort(Comparator.reverseOrder());
+        
+        return perfectDays;
+    }
 }
