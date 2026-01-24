@@ -3,10 +3,12 @@ package com.dylanjohnpratt.paradise.be.controller;
 import com.dylanjohnpratt.paradise.be.dto.*;
 import com.dylanjohnpratt.paradise.be.model.DailyTask;
 import com.dylanjohnpratt.paradise.be.model.TodoTask;
+import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.TaskService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -16,6 +18,7 @@ import java.util.List;
  * REST controller handling all task-related HTTP endpoints.
  * Maps the base path /users/{userId}/tasks and delegates business logic to TaskService.
  * Extracts userId from the request path for all endpoints to ensure user-scoped operations.
+ * Admins can access any user's tasks; regular users can only access their own.
  */
 @RestController
 @RequestMapping("/users/{userId}/tasks")
@@ -28,15 +31,29 @@ public class TaskController {
     }
 
     /**
+     * Checks if the authenticated user has the ADMIN role.
+     */
+    private boolean isAdmin(User user) {
+        return user.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    /**
      * Retrieves all tasks (TODO and Daily) for the specified user.
      * Returns both task types in a single response with TODO tasks grouped by category.
      *
      * @param userId the unique identifier of the user from the path
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing UserTasksResponse with 200 OK status
      */
     @GetMapping
-    public ResponseEntity<UserTasksResponse> getAllTasks(@PathVariable String userId) {
-        UserTasksResponse response = taskService.getAllTasksForUser(userId);
+    public ResponseEntity<UserTasksResponse> getAllTasks(
+            @PathVariable String userId,
+            @AuthenticationPrincipal User currentUser) {
+        UserTasksResponse response = taskService.getAllTasksForUser(
+                userId, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.ok(response);
     }
 
@@ -46,13 +63,19 @@ public class TaskController {
      *
      * @param userId the unique identifier of the user from the path
      * @param request the task request containing id, description, category, order, and optional parentId
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing the created TodoTask with 201 Created status
      */
     @PostMapping("/todo")
     public ResponseEntity<TodoTask> createTodoTask(
             @PathVariable String userId,
-            @RequestBody TodoTaskRequest request) {
-        TodoTask task = taskService.createTodoTask(userId, request);
+            @RequestBody TodoTaskRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        TodoTask task = taskService.createTodoTask(
+                userId, 
+                request, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -63,13 +86,19 @@ public class TaskController {
      *
      * @param userId the unique identifier of the user from the path
      * @param request the task request containing id, description, and order
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing the created DailyTask with 201 Created status
      */
     @PostMapping("/daily")
     public ResponseEntity<DailyTask> createDailyTask(
             @PathVariable String userId,
-            @RequestBody DailyTaskRequest request) {
-        DailyTask task = taskService.createDailyTask(userId, request);
+            @RequestBody DailyTaskRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        DailyTask task = taskService.createDailyTask(
+                userId, 
+                request, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -81,14 +110,21 @@ public class TaskController {
      * @param userId the unique identifier of the user from the path
      * @param id the unique identifier of the task to update
      * @param request the task request containing optional description, completed, and order fields
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing the updated TodoTask with 200 OK status
      */
     @PutMapping("/todo/{id}")
     public ResponseEntity<TodoTask> updateTodoTask(
             @PathVariable String userId,
             @PathVariable @NonNull String id,
-            @RequestBody TodoTaskRequest request) {
-        TodoTask task = taskService.updateTodoTask(userId, id, request);
+            @RequestBody TodoTaskRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        TodoTask task = taskService.updateTodoTask(
+                userId, 
+                id, 
+                request, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.ok(task);
     }
 
@@ -100,14 +136,21 @@ public class TaskController {
      * @param userId the unique identifier of the user from the path
      * @param id the unique identifier of the task to update
      * @param request the task request containing optional description, completed, and order fields
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing the updated DailyTask with 200 OK status
      */
     @PutMapping("/daily/{id}")
     public ResponseEntity<DailyTask> updateDailyTask(
             @PathVariable String userId,
             @PathVariable @NonNull String id,
-            @RequestBody DailyTaskRequest request) {
-        DailyTask task = taskService.updateDailyTask(userId, id, request);
+            @RequestBody DailyTaskRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        DailyTask task = taskService.updateDailyTask(
+                userId, 
+                id, 
+                request, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.ok(task);
     }
 
@@ -118,13 +161,19 @@ public class TaskController {
      *
      * @param userId the unique identifier of the user from the path
      * @param id the unique identifier of the task to delete
+     * @param currentUser the authenticated user
      * @return ResponseEntity with 204 No Content status
      */
     @DeleteMapping("/todo/{id}")
     public ResponseEntity<Void> deleteTodoTask(
             @PathVariable String userId,
-            @PathVariable @NonNull String id) {
-        taskService.deleteTodoTask(userId, id);
+            @PathVariable @NonNull String id,
+            @AuthenticationPrincipal User currentUser) {
+        taskService.deleteTodoTask(
+                userId, 
+                id, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.noContent().build();
     }
 
@@ -134,13 +183,19 @@ public class TaskController {
      *
      * @param userId the unique identifier of the user from the path
      * @param id the unique identifier of the task to delete
+     * @param currentUser the authenticated user
      * @return ResponseEntity with 204 No Content status
      */
     @DeleteMapping("/daily/{id}")
     public ResponseEntity<Void> deleteDailyTask(
             @PathVariable String userId,
-            @PathVariable @NonNull String id) {
-        taskService.deleteDailyTask(userId, id);
+            @PathVariable @NonNull String id,
+            @AuthenticationPrincipal User currentUser) {
+        taskService.deleteDailyTask(
+                userId, 
+                id, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.noContent().build();
     }
 
@@ -151,13 +206,19 @@ public class TaskController {
      *
      * @param userId the unique identifier of the user from the path
      * @param id the unique identifier of the daily task
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing list of completion dates with 200 OK status
      */
     @GetMapping("/daily/{id}/completions")
     public ResponseEntity<List<LocalDate>> getDailyTaskCompletions(
             @PathVariable String userId,
-            @PathVariable @NonNull String id) {
-        List<LocalDate> completions = taskService.getCompletionHistory(userId, id);
+            @PathVariable @NonNull String id,
+            @AuthenticationPrincipal User currentUser) {
+        List<LocalDate> completions = taskService.getCompletionHistory(
+                userId, 
+                id, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.ok(completions);
     }
 
@@ -168,13 +229,15 @@ public class TaskController {
      *
      * @param userId the unique identifier of the user from the path
      * @param year the year to retrieve perfect days for (optional, defaults to current year)
+     * @param currentUser the authenticated user
      * @return ResponseEntity containing list of perfect day dates with 200 OK status
      *         or 400 Bad Request if year is invalid
      */
     @GetMapping("/daily/perfect-days")
     public ResponseEntity<List<LocalDate>> getPerfectDays(
             @PathVariable String userId,
-            @RequestParam(required = false) Integer year) {
+            @RequestParam(required = false) Integer year,
+            @AuthenticationPrincipal User currentUser) {
         
         // Default to current year if not provided (Requirement 1.5)
         int targetYear = (year != null) ? year : LocalDate.now().getYear();
@@ -185,7 +248,11 @@ public class TaskController {
             return ResponseEntity.badRequest().build();
         }
         
-        List<LocalDate> perfectDays = taskService.getPerfectDays(userId, targetYear);
+        List<LocalDate> perfectDays = taskService.getPerfectDays(
+                userId, 
+                targetYear, 
+                currentUser.getUsername(), 
+                isAdmin(currentUser));
         return ResponseEntity.ok(perfectDays);
     }
 }

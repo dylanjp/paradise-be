@@ -27,6 +27,10 @@ public class TodoTask {
     private int order;
     
     private String parentId;  // null for root tasks
+    
+    private Boolean createdFromNotification;  // null treated as false for existing rows
+    
+    private Long sourceNotificationId;  // null if not created from notification
 
     public TodoTask() {
     }
@@ -39,6 +43,20 @@ public class TodoTask {
         this.completed = completed;
         this.order = order;
         this.parentId = parentId;
+        this.createdFromNotification = false;
+        this.sourceNotificationId = null;
+    }
+    
+    public TodoTask(String id, String userId, String description, String category, boolean completed, int order, String parentId, boolean createdFromNotification, Long sourceNotificationId) {
+        this.id = id;
+        this.userId = userId;
+        this.description = description;
+        this.category = category;
+        this.completed = completed;
+        this.order = order;
+        this.parentId = parentId;
+        this.createdFromNotification = createdFromNotification;
+        this.sourceNotificationId = sourceNotificationId;
     }
 
     public String getId() {
@@ -95,5 +113,21 @@ public class TodoTask {
 
     public void setParentId(String parentId) {
         this.parentId = parentId;
+    }
+    
+    public boolean isCreatedFromNotification() {
+        return createdFromNotification != null && createdFromNotification;
+    }
+    
+    public void setCreatedFromNotification(boolean createdFromNotification) {
+        this.createdFromNotification = createdFromNotification;
+    }
+    
+    public Long getSourceNotificationId() {
+        return sourceNotificationId;
+    }
+    
+    public void setSourceNotificationId(Long sourceNotificationId) {
+        this.sourceNotificationId = sourceNotificationId;
     }
 }

@@ -40,9 +40,16 @@ public class TaskService {
      * Returns empty collections if the user has no tasks.
      *
      * @param userId the unique identifier of the user
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return UserTasksResponse containing TODO tasks grouped by category and Daily tasks as a list
      */
-    public UserTasksResponse getAllTasksForUser(String userId) {
+    public UserTasksResponse getAllTasksForUser(String userId, String requestingUserId, boolean isAdmin) {
+        // Users can only access their own tasks (userId in path must match authenticated user)
+        // Note: The comparison uses string equality - frontend must send the same format as the user ID
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
         List<TodoTask> userTodoTasks = todoTaskRepository.findByUserId(userId);
         List<DailyTask> userDailyTasks = dailyTaskRepository.findByUserId(userId);
         
@@ -62,9 +69,16 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param request the task request containing id, description, category, order, and optional parentId
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return the created TodoTask
      */
-    public TodoTask createTodoTask(String userId, TodoTaskRequest request) {
+    public TodoTask createTodoTask(String userId, TodoTaskRequest request, String requestingUserId, boolean isAdmin) {
+        // Users can only create tasks for themselves
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         TodoTask task = new TodoTask(
                 request.getId(),
                 userId,
@@ -85,9 +99,16 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param request the task request containing id, description, and order
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return the created DailyTask
      */
-    public DailyTask createDailyTask(String userId, DailyTaskRequest request) {
+    public DailyTask createDailyTask(String userId, DailyTaskRequest request, String requestingUserId, boolean isAdmin) {
+        // Users can only create tasks for themselves
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         DailyTask task = new DailyTask(
                 request.getId(),
                 userId,
@@ -108,15 +129,22 @@ public class TaskService {
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the task to update
      * @param request the task request containing optional description, completed, order, and parentId fields
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return the updated TodoTask
      * @throws TaskNotFoundException if the task is not found for the specified user
      * @throws IllegalArgumentException if the parentId is invalid
      */
-    public TodoTask updateTodoTask(String userId, @NonNull String taskId, TodoTaskRequest request) {
+    public TodoTask updateTodoTask(String userId, @NonNull String taskId, TodoTaskRequest request, String requestingUserId, boolean isAdmin) {
+        // Users can only update their own tasks
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
         
-        // Verify the task belongs to the user
+        // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("TODO task not found: " + taskId);
         }
@@ -177,15 +205,22 @@ public class TaskService {
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the task to update
      * @param request the task request containing optional description, completed, and order fields
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return the updated DailyTask
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
     @Transactional
-    public DailyTask updateDailyTask(String userId, @NonNull String taskId, DailyTaskRequest request) {
+    public DailyTask updateDailyTask(String userId, @NonNull String taskId, DailyTaskRequest request, String requestingUserId, boolean isAdmin) {
+        // Users can only update their own tasks
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
         
-        // Verify the task belongs to the user
+        // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("Daily task not found: " + taskId);
         }
@@ -245,14 +280,21 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the task to delete
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
     @Transactional
-    public void deleteTodoTask(String userId, @NonNull String taskId) {
+    public void deleteTodoTask(String userId, @NonNull String taskId, String requestingUserId, boolean isAdmin) {
+        // Users can only delete their own tasks
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
         
-        // Verify the task belongs to the user
+        // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("TODO task not found: " + taskId);
         }
@@ -277,14 +319,21 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the task to delete
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
     @Transactional
-    public void deleteDailyTask(String userId, @NonNull String taskId) {
+    public void deleteDailyTask(String userId, @NonNull String taskId, String requestingUserId, boolean isAdmin) {
+        // Users can only delete their own tasks
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
         
-        // Verify the task belongs to the user
+        // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("Daily task not found: " + taskId);
         }
@@ -302,14 +351,21 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param taskId the unique identifier of the daily task
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return list of completion dates in descending order, or empty list if no completions exist
      * @throws TaskNotFoundException if the task is not found for the specified user
      */
-    public List<LocalDate> getCompletionHistory(String userId, @NonNull String taskId) {
+    public List<LocalDate> getCompletionHistory(String userId, @NonNull String taskId, String requestingUserId, boolean isAdmin) {
+        // Users can only view their own tasks
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
+        
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
         
-        // Verify the task belongs to the user
+        // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("Daily task not found: " + taskId);
         }
@@ -329,9 +385,15 @@ public class TaskService {
      *
      * @param userId the unique identifier of the user
      * @param year the year to retrieve perfect days for
+     * @param requestingUserId the ID of the user making the request
+     * @param isAdmin whether the requesting user has admin privileges
      * @return list of perfect day dates in descending order (most recent first), or empty list if none
      */
-    public List<LocalDate> getPerfectDays(String userId, int year) {
+    public List<LocalDate> getPerfectDays(String userId, int year, String requestingUserId, boolean isAdmin) {
+        // Users can only view their own data
+        if (!userId.equals(requestingUserId)) {
+            throw new TaskNotFoundException("Access denied");
+        }
         // Fetch all daily tasks for the user
         List<DailyTask> userDailyTasks = dailyTaskRepository.findByUserId(userId);
         

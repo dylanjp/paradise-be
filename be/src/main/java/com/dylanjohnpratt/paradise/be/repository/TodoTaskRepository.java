@@ -38,4 +38,14 @@ public interface TodoTaskRepository extends JpaRepository<TodoTask, String> {
      * @return list of TODO tasks that are children of the specified parent
      */
     List<TodoTask> findByUserIdAndParentId(String userId, String parentId);
+    
+    /**
+     * Checks if a TODO task exists for a specific user that was created from a specific notification.
+     * Used to prevent duplicate TODO creation from the same notification.
+     *
+     * @param userId the user ID
+     * @param sourceNotificationId the source notification ID
+     * @return true if a task exists from this notification for this user
+     */
+    boolean existsByUserIdAndSourceNotificationId(String userId, Long sourceNotificationId);
 }
