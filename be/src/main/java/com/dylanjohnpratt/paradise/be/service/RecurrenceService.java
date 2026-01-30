@@ -60,6 +60,8 @@ public class RecurrenceService {
             case MONTHLY -> evaluateMonthlyRecurrence(rule, localDate);
             case RANDOM_WEEKLY -> evaluateRandomWeeklyRecurrence(rule, localDate);
             case RANDOM_MONTHLY -> evaluateRandomMonthlyRecurrence(rule, localDate);
+            case YEARLY -> evaluateYearlyRecurrence(rule, localDate);
+            case RANDOM_DATE_RANGE -> evaluateRandomDateRangeRecurrence(rule, localDate);
         };
     }
 
@@ -96,6 +98,17 @@ public class RecurrenceService {
                 yield rule.withRandomValuesInitialized(null, randomDayOfMonth);
             }
             case DAILY, WEEKLY, MONTHLY -> rule;  // Non-random types don't need initialization
+            case YEARLY -> rule;  // YEARLY doesn't need random initialization
+            case RANDOM_DATE_RANGE -> {
+                if (rule.isRandomValuesInitialized()) {
+                    yield rule;  // Already initialized
+                }
+                // Generate random date within the specified range
+                int[] randomDate = generateRandomDateInRange(
+                        rule.getStartMonth(), rule.getStartDay(),
+                        rule.getEndMonth(), rule.getEndDay());
+                yield rule.withRandomDateRangeInitialized(randomDate[0], randomDate[1]);
+            }
         };
     }
 
@@ -115,6 +128,14 @@ public class RecurrenceService {
 
         LocalDate localFromDate = convertToUserTimeZone(fromDate, userTimeZone);
 
+        // Handle YEARLY and RANDOM_DATE_RANGE with optimized logic
+        if (rule.getType() == RecurrenceRule.RecurrenceType.YEARLY) {
+            return getNextYearlyDeliveryDate(rule, localFromDate);
+        }
+        if (rule.getType() == RecurrenceRule.RecurrenceType.RANDOM_DATE_RANGE) {
+            return getNextRandomDateRangeDeliveryDate(rule, localFromDate);
+        }
+
         // Check up to 366 days ahead (covers all recurrence patterns)
         for (int i = 0; i <= 366; i++) {
             LocalDate candidateDate = localFromDate.plusDays(i);
@@ -124,6 +145,97 @@ public class RecurrenceService {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Gets the next delivery date for a YEARLY recurrence rule.
+     * Handles leap year for Feb 29 by skipping to the next leap year if needed.
+     * 
+     * @param rule the YEARLY recurrence rule
+     * @param fromDate the date to start searching from (inclusive)
+     * @return the next delivery date
+     */
+    private Optional<LocalDate> getNextYearlyDeliveryDate(RecurrenceRule rule, LocalDate fromDate) {
+        Integer month = rule.getMonth();
+        Integer dayOfMonth = rule.getDayOfMonth();
+        
+        if (month == null || dayOfMonth == null) {
+            return Optional.empty();
+        }
+        
+        // Special handling for Feb 29 (leap year)
+        if (month == 2 && dayOfMonth == 29) {
+            return getNextLeapYearFeb29(fromDate);
+        }
+        
+        // Try current year first
+        LocalDate targetThisYear = LocalDate.of(fromDate.getYear(), month, dayOfMonth);
+        if (!targetThisYear.isBefore(fromDate)) {
+            return Optional.of(targetThisYear);
+        }
+        
+        // Otherwise, return next year
+        return Optional.of(LocalDate.of(fromDate.getYear() + 1, month, dayOfMonth));
+    }
+
+    /**
+     * Gets the next Feb 29 date (leap year only).
+     */
+    private Optional<LocalDate> getNextLeapYearFeb29(LocalDate fromDate) {
+        int year = fromDate.getYear();
+        
+        // Check if this year is a leap year and Feb 29 hasn't passed
+        if (isLeapYear(year)) {
+            LocalDate feb29ThisYear = LocalDate.of(year, 2, 29);
+            if (!feb29ThisYear.isBefore(fromDate)) {
+                return Optional.of(feb29ThisYear);
+            }
+        }
+        
+        // Find the next leap year
+        int nextLeapYear = year + 1;
+        while (!isLeapYear(nextLeapYear)) {
+            nextLeapYear++;
+        }
+        
+        return Optional.of(LocalDate.of(nextLeapYear, 2, 29));
+    }
+
+    /**
+     * Checks if a year is a leap year.
+     */
+    private boolean isLeapYear(int year) {
+        return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+    }
+
+    /**
+     * Gets the next delivery date for a RANDOM_DATE_RANGE recurrence rule.
+     * Uses the stored randomMonth/randomDay as the target date.
+     * 
+     * @param rule the RANDOM_DATE_RANGE recurrence rule (must be initialized)
+     * @param fromDate the date to start searching from (inclusive)
+     * @return the next delivery date
+     */
+    private Optional<LocalDate> getNextRandomDateRangeDeliveryDate(RecurrenceRule rule, LocalDate fromDate) {
+        if (!rule.isRandomValuesInitialized()) {
+            throw new IllegalStateException("Random values must be initialized before evaluation");
+        }
+        
+        Integer randomMonth = rule.getRandomMonth();
+        Integer randomDay = rule.getRandomDay();
+        
+        if (randomMonth == null || randomDay == null) {
+            return Optional.empty();
+        }
+        
+        // Try current year first
+        LocalDate targetThisYear = LocalDate.of(fromDate.getYear(), randomMonth, randomDay);
+        if (!targetThisYear.isBefore(fromDate)) {
+            return Optional.of(targetThisYear);
+        }
+        
+        // Otherwise, return next year
+        return Optional.of(LocalDate.of(fromDate.getYear() + 1, randomMonth, randomDay));
     }
 
     /**
@@ -209,5 +321,130 @@ public class RecurrenceService {
             return false;  // Day doesn't exist in this month
         }
         return date.getDayOfMonth() == dayOfMonth;
+    }
+
+    /**
+     * Evaluates yearly recurrence - delivers on the specified month and day.
+     * Returns true only if both the month and day match.
+     * 
+     * @param rule the recurrence rule containing month and dayOfMonth
+     * @param date the date to check
+     * @return true if the date matches the yearly recurrence pattern
+     */
+    private boolean evaluateYearlyRecurrence(RecurrenceRule rule, LocalDate date) {
+        Integer month = rule.getMonth();
+        Integer dayOfMonth = rule.getDayOfMonth();
+        
+        if (month == null || dayOfMonth == null) {
+            return false;
+        }
+        
+        return date.getMonthValue() == month && date.getDayOfMonth() == dayOfMonth;
+    }
+
+    /**
+     * Evaluates random date range recurrence - delivers on the stored random month and day.
+     * Requires random values to be initialized first.
+     * 
+     * @param rule the recurrence rule containing randomMonth and randomDay
+     * @param date the date to check
+     * @return true if the date matches the stored random date
+     * @throws IllegalStateException if random values have not been initialized
+     */
+    private boolean evaluateRandomDateRangeRecurrence(RecurrenceRule rule, LocalDate date) {
+        if (!rule.isRandomValuesInitialized()) {
+            throw new IllegalStateException("Random values must be initialized before evaluation");
+        }
+        
+        Integer randomMonth = rule.getRandomMonth();
+        Integer randomDay = rule.getRandomDay();
+        
+        if (randomMonth == null || randomDay == null) {
+            return false;
+        }
+        
+        return date.getMonthValue() == randomMonth && date.getDayOfMonth() == randomDay;
+    }
+
+    /**
+     * Generates a random date within the specified range.
+     * Handles cross-year ranges (e.g., December 15 to January 15).
+     * 
+     * @param startMonth start month of range (1-12)
+     * @param startDay start day of range (1-31)
+     * @param endMonth end month of range (1-12)
+     * @param endDay end day of range (1-31)
+     * @return array of [month, day] representing the random date
+     */
+    private int[] generateRandomDateInRange(int startMonth, int startDay, int endMonth, int endDay) {
+        // Calculate total days in the range
+        int totalDays = calculateDaysInRange(startMonth, startDay, endMonth, endDay);
+        
+        // Generate random day index (0-based)
+        int randomIndex = random.nextInt(totalDays);
+        
+        // Convert index back to month/day
+        return indexToMonthDay(startMonth, startDay, endMonth, endDay, randomIndex);
+    }
+
+    /**
+     * Calculates the total number of days in a date range.
+     * Handles cross-year ranges where startMonth > endMonth.
+     * Uses a non-leap year (365 days) for calculation.
+     */
+    private int calculateDaysInRange(int startMonth, int startDay, int endMonth, int endDay) {
+        if (startMonth < endMonth || (startMonth == endMonth && startDay <= endDay)) {
+            // Same year range (e.g., Jan 15 to Mar 20)
+            return dayOfYear(endMonth, endDay) - dayOfYear(startMonth, startDay) + 1;
+        } else {
+            // Cross-year range (e.g., Dec 15 to Jan 15)
+            // Days from start to end of year + days from start of year to end
+            int daysToEndOfYear = 365 - dayOfYear(startMonth, startDay) + 1;
+            int daysFromStartOfYear = dayOfYear(endMonth, endDay);
+            return daysToEndOfYear + daysFromStartOfYear;
+        }
+    }
+
+    /**
+     * Converts a month/day to day of year (1-365).
+     * Uses standard non-leap year day counts.
+     */
+    private int dayOfYear(int month, int day) {
+        int[] daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        int dayOfYear = day;
+        for (int m = 0; m < month - 1; m++) {
+            dayOfYear += daysInMonth[m];
+        }
+        return dayOfYear;
+    }
+
+    /**
+     * Converts a random index back to month/day within the specified range.
+     * Handles cross-year ranges.
+     */
+    private int[] indexToMonthDay(int startMonth, int startDay, int endMonth, int endDay, int index) {
+        int[] daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        
+        int currentMonth = startMonth;
+        int currentDay = startDay;
+        int remaining = index;
+        
+        while (remaining > 0) {
+            int daysLeftInMonth = daysInMonth[currentMonth - 1] - currentDay + 1;
+            
+            if (remaining < daysLeftInMonth) {
+                currentDay += remaining;
+                remaining = 0;
+            } else {
+                remaining -= daysLeftInMonth;
+                currentMonth++;
+                if (currentMonth > 12) {
+                    currentMonth = 1;  // Wrap to January
+                }
+                currentDay = 1;
+            }
+        }
+        
+        return new int[]{currentMonth, currentDay};
     }
 }

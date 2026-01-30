@@ -31,13 +31,14 @@ class RecurringActionTodoServicePropertyTest {
         InMemoryOccurrenceTrackerRepository occurrenceRepo = new InMemoryOccurrenceTrackerRepository();
         InMemoryTodoTaskRepository todoRepo = new InMemoryTodoTaskRepository();
         InMemoryUserRepository userRepo = new InMemoryUserRepository();
+        InMemoryUserNotificationStateRepository userNotificationStateRepo = new InMemoryUserNotificationStateRepository();
         RecurrenceService recurrenceService = new RecurrenceService(new Random(42));
         
         RecurringActionTodoService service = new RecurringActionTodoService(
-            notificationRepo, occurrenceRepo, todoRepo, recurrenceService, userRepo
+            notificationRepo, occurrenceRepo, todoRepo, recurrenceService, userRepo, userNotificationStateRepo
         );
         
-        return new TestContext(service, notificationRepo, occurrenceRepo, todoRepo, userRepo);
+        return new TestContext(service, notificationRepo, occurrenceRepo, todoRepo, userRepo, userNotificationStateRepo);
     }
 
     /**
@@ -48,7 +49,8 @@ class RecurringActionTodoServicePropertyTest {
         InMemoryNotificationRepository notificationRepo,
         InMemoryOccurrenceTrackerRepository occurrenceRepo,
         InMemoryTodoTaskRepository todoRepo,
-        InMemoryUserRepository userRepo
+        InMemoryUserRepository userRepo,
+        InMemoryUserNotificationStateRepository userNotificationStateRepo
     ) {}
 
     /**
@@ -507,6 +509,109 @@ class RecurringActionTodoServicePropertyTest {
         @Override @NonNull public org.springframework.data.domain.Page<User> findAll(@NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
     }
 
+    /**
+     * In-memory implementation of UserNotificationStateRepository for testing.
+     */
+    private static class InMemoryUserNotificationStateRepository implements UserNotificationStateRepository {
+        private final Map<Long, UserNotificationState> states = new HashMap<>();
+        private long idCounter = 0;
+
+        @Override
+        @NonNull
+        public <S extends UserNotificationState> S save(@NonNull S state) {
+            if (state.getId() == null) {
+                state.setId(++idCounter);
+            }
+            states.put(state.getId(), state);
+            return state;
+        }
+
+        @Override
+        @NonNull
+        public Optional<UserNotificationState> findById(@NonNull Long id) {
+            return requireNonNull(Optional.ofNullable(states.get(id)));
+        }
+
+        @Override
+        public Optional<UserNotificationState> findByNotificationIdAndUserId(Long notificationId, Long userId) {
+            return states.values().stream()
+                .filter(s -> s.getNotificationId().equals(notificationId) && s.getUserId().equals(userId))
+                .findFirst();
+        }
+
+        @Override
+        public List<UserNotificationState> findByUserId(Long userId) {
+            return states.values().stream()
+                .filter(s -> s.getUserId().equals(userId))
+                .toList();
+        }
+
+        @Override
+        public List<UserNotificationState> findByNotificationId(Long notificationId) {
+            return states.values().stream()
+                .filter(s -> s.getNotificationId().equals(notificationId))
+                .toList();
+        }
+
+        @Override
+        public boolean existsByNotificationIdAndUserId(Long notificationId, Long userId) {
+            return states.values().stream()
+                .anyMatch(s -> s.getNotificationId().equals(notificationId) && s.getUserId().equals(userId));
+        }
+
+        @Override
+        public void deleteByNotificationIdIn(List<Long> notificationIds) {
+            states.entrySet().removeIf(e -> notificationIds.contains(e.getValue().getNotificationId()));
+        }
+
+        @Override
+        public void deleteByNotificationId(Long notificationId) {
+            states.entrySet().removeIf(e -> e.getValue().getNotificationId().equals(notificationId));
+        }
+
+        @Override
+        public int resetReadStateForNotification(Long notificationId) {
+            int count = 0;
+            for (UserNotificationState state : states.values()) {
+                if (state.getNotificationId().equals(notificationId)) {
+                    state.markAsUnread();
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        // Unused methods for testing
+        @Override @NonNull public List<UserNotificationState> findAll() { return new ArrayList<>(states.values()); }
+        @Override @NonNull public List<UserNotificationState> findAllById(@NonNull Iterable<Long> ids) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends UserNotificationState> List<S> saveAll(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public boolean existsById(@NonNull Long id) { return states.containsKey(id); }
+        @Override public long count() { return states.size(); }
+        @Override public void deleteById(@NonNull Long id) { states.remove(id); }
+        @Override public void delete(@NonNull UserNotificationState entity) { states.remove(entity.getId()); }
+        @Override public void deleteAllById(@NonNull Iterable<? extends Long> ids) { }
+        @Override public void deleteAll(@NonNull Iterable<? extends UserNotificationState> entities) { }
+        @Override public void deleteAll() { states.clear(); }
+        @Override public void flush() { }
+        @Override @NonNull public <S extends UserNotificationState> S saveAndFlush(@NonNull S entity) { return save(entity); }
+        @Override @NonNull public <S extends UserNotificationState> List<S> saveAllAndFlush(@NonNull Iterable<S> entities) { return requireNonNull(List.of()); }
+        @Override public void deleteAllInBatch(@NonNull Iterable<UserNotificationState> entities) { }
+        @Override public void deleteAllByIdInBatch(@NonNull Iterable<Long> ids) { }
+        @Override public void deleteAllInBatch() { }
+        @Override @NonNull public UserNotificationState getOne(@NonNull Long id) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public UserNotificationState getById(@NonNull Long id) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public UserNotificationState getReferenceById(@NonNull Long id) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public <S extends UserNotificationState> Optional<S> findOne(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(Optional.empty()); }
+        @Override @NonNull public <S extends UserNotificationState> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends UserNotificationState> List<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public <S extends UserNotificationState> org.springframework.data.domain.Page<S> findAll(@NonNull org.springframework.data.domain.Example<S> example, @NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
+        @Override public <S extends UserNotificationState> long count(@NonNull org.springframework.data.domain.Example<S> example) { return 0; }
+        @Override public <S extends UserNotificationState> boolean exists(@NonNull org.springframework.data.domain.Example<S> example) { return false; }
+        @Override @NonNull public <S extends UserNotificationState, R> R findBy(@NonNull org.springframework.data.domain.Example<S> example, @NonNull java.util.function.Function<org.springframework.data.repository.query.FluentQuery.FetchableFluentQuery<S>, R> queryFunction) { throw new UnsupportedOperationException(); }
+        @Override @NonNull public List<UserNotificationState> findAll(@NonNull org.springframework.data.domain.Sort sort) { return requireNonNull(List.of()); }
+        @Override @NonNull public org.springframework.data.domain.Page<UserNotificationState> findAll(@NonNull org.springframework.data.domain.Pageable pageable) { throw new UnsupportedOperationException(); }
+    }
+
     // ==================== Property Tests for Idempotency and Error Resilience ====================
 
     /**
@@ -619,10 +724,11 @@ class RecurringActionTodoServicePropertyTest {
         InMemoryOccurrenceTrackerRepository occurrenceRepo = new InMemoryOccurrenceTrackerRepository();
         FailingTodoTaskRepository todoRepo = new FailingTodoTaskRepository(actualFailingIndex + 1);
         InMemoryUserRepository userRepo = new InMemoryUserRepository();
+        InMemoryUserNotificationStateRepository userNotificationStateRepo = new InMemoryUserNotificationStateRepository();
         RecurrenceService recurrenceService = new RecurrenceService(new Random(42));
         
         RecurringActionTodoService service = new RecurringActionTodoService(
-            notificationRepo, occurrenceRepo, todoRepo, recurrenceService, userRepo
+            notificationRepo, occurrenceRepo, todoRepo, recurrenceService, userRepo, userNotificationStateRepo
         );
         
         // Create active users

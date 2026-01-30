@@ -338,6 +338,18 @@ class NotificationServicePropertyTest {
             states.entrySet().removeIf(entry -> entry.getValue().getNotificationId().equals(notificationId));
         }
 
+        @Override
+        public int resetReadStateForNotification(Long notificationId) {
+            int count = 0;
+            for (UserNotificationState state : states.values()) {
+                if (state.getNotificationId().equals(notificationId)) {
+                    state.markAsUnread();
+                    count++;
+                }
+            }
+            return count;
+        }
+
         // Unused methods for testing
         @Override @NonNull public List<UserNotificationState> findAll() { return new ArrayList<>(states.values()); }
         @Override @NonNull public List<UserNotificationState> findAllById(@NonNull Iterable<Long> ids) { return requireNonNull(List.of()); }

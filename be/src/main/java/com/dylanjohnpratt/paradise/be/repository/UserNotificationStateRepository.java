@@ -71,4 +71,16 @@ public interface UserNotificationStateRepository extends JpaRepository<UserNotif
      * @param notificationId the notification ID
      */
     void deleteByNotificationId(Long notificationId);
+
+    /**
+     * Resets read state to unread for all users of a notification.
+     * Sets read=false and readAt=null for all matching records.
+     * Used when a recurring notification recurs to ensure users see it as new.
+     *
+     * @param notificationId the notification ID
+     * @return number of records updated
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE UserNotificationState s SET s.read = false, s.readAt = null WHERE s.notificationId = :notificationId")
+    int resetReadStateForNotification(@Param("notificationId") Long notificationId);
 }

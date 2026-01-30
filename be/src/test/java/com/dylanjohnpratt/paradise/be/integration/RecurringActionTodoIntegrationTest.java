@@ -11,6 +11,7 @@ import com.dylanjohnpratt.paradise.be.repository.TodoTaskRepository;
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import com.dylanjohnpratt.paradise.be.service.ProcessingResult;
 import com.dylanjohnpratt.paradise.be.service.RecurringActionTodoService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,9 @@ class RecurringActionTodoIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private User user1;
     private User user2;
@@ -98,10 +102,13 @@ class RecurringActionTodoIntegrationTest {
                 actionItem
         );
         notification = notificationRepository.save(notification);
+        entityManager.flush();  // Ensure notification and targetUserIds are persisted
+        entityManager.clear();  // Clear persistence context to force fresh load
         final Long notificationId = notification.getId();
 
         // Act: Process recurring notifications
         ProcessingResult result = recurringActionTodoService.processRecurringNotifications();
+        entityManager.flush();  // Ensure TODO tasks are persisted to database
 
         // Assert: Verify processing result
         assertThat(result.notificationsProcessed()).isEqualTo(1);
@@ -109,7 +116,7 @@ class RecurringActionTodoIntegrationTest {
         assertThat(result.errors()).isEqualTo(0);
 
         // Assert: Verify TODOs were created for user1
-        List<TodoTask> user1Tasks = todoTaskRepository.findByUserId(user1.getId().toString());
+        List<TodoTask> user1Tasks = todoTaskRepository.findByUserId(user1.getUsername());
         assertThat(user1Tasks).hasSize(1);
         TodoTask user1Task = user1Tasks.get(0);
         assertThat(user1Task.getDescription()).isEqualTo("Complete daily review");
@@ -121,7 +128,7 @@ class RecurringActionTodoIntegrationTest {
         assertThat(user1Task.getParentId()).isNull();
 
         // Assert: Verify TODOs were created for user2
-        List<TodoTask> user2Tasks = todoTaskRepository.findByUserId(user2.getId().toString());
+        List<TodoTask> user2Tasks = todoTaskRepository.findByUserId(user2.getUsername());
         assertThat(user2Tasks).hasSize(1);
         TodoTask user2Task = user2Tasks.get(0);
         assertThat(user2Task.getDescription()).isEqualTo("Complete daily review");
@@ -130,7 +137,7 @@ class RecurringActionTodoIntegrationTest {
         assertThat(user2Task.getSourceNotificationId()).isEqualTo(notificationId);
 
         // Assert: Verify NO TODOs were created for user3 (not targeted)
-        List<TodoTask> user3Tasks = todoTaskRepository.findByUserId(user3.getId().toString());
+        List<TodoTask> user3Tasks = todoTaskRepository.findByUserId(user3.getUsername());
         assertThat(user3Tasks).isEmpty();
 
         // Assert: Verify occurrence was tracked

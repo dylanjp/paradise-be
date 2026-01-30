@@ -1,6 +1,7 @@
 package com.dylanjohnpratt.paradise.be.model;
 
 import jakarta.persistence.*;
+import org.springframework.data.domain.Persistable;
 
 /**
  * Represents a persistent TODO task that belongs to a category and may have parent-child relationships.
@@ -8,7 +9,7 @@ import jakarta.persistence.*;
  */
 @Entity
 @Table(name = "todo_tasks")
-public class TodoTask {
+public class TodoTask implements Persistable<String> {
     @Id
     private String id;
     
@@ -31,6 +32,9 @@ public class TodoTask {
     private Boolean createdFromNotification;  // null treated as false for existing rows
     
     private Long sourceNotificationId;  // null if not created from notification
+    
+    @Transient
+    private boolean isNew = true;
 
     public TodoTask() {
     }
@@ -59,12 +63,24 @@ public class TodoTask {
         this.sourceNotificationId = sourceNotificationId;
     }
 
+    @Override
     public String getId() {
         return id;
     }
 
     public void setId(String id) {
         this.id = id;
+    }
+    
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+    
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.isNew = false;
     }
 
     public String getUserId() {

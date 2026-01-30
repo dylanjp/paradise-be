@@ -11,10 +11,12 @@ import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.NotificationRepository;
 import com.dylanjohnpratt.paradise.be.repository.OccurrenceTrackerRepository;
 import com.dylanjohnpratt.paradise.be.repository.TodoTaskRepository;
+import com.dylanjohnpratt.paradise.be.repository.UserNotificationStateRepository;
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,18 +43,21 @@ public class RecurringActionTodoService {
     private final TodoTaskRepository todoTaskRepository;
     private final RecurrenceService recurrenceService;
     private final UserRepository userRepository;
+    private final UserNotificationStateRepository userNotificationStateRepository;
 
     public RecurringActionTodoService(
             NotificationRepository notificationRepository,
             OccurrenceTrackerRepository occurrenceTrackerRepository,
             TodoTaskRepository todoTaskRepository,
             RecurrenceService recurrenceService,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            UserNotificationStateRepository userNotificationStateRepository) {
         this.notificationRepository = notificationRepository;
         this.occurrenceTrackerRepository = occurrenceTrackerRepository;
         this.todoTaskRepository = todoTaskRepository;
         this.recurrenceService = recurrenceService;
         this.userRepository = userRepository;
+        this.userNotificationStateRepository = userNotificationStateRepository;
     }
 
     /**
@@ -61,6 +66,7 @@ public class RecurringActionTodoService {
      * 
      * @return ProcessingResult containing counts of processed notifications and created tasks
      */
+    @Transactional
     public ProcessingResult processRecurringNotifications() {
         LocalDate today = LocalDate.now();
         logger.info("Starting recurring action TODO processing for date: {}", today);
@@ -76,6 +82,9 @@ public class RecurringActionTodoService {
                     notification.getId(), notification.getSubject());
                 
                 int todosCreated = createTodosForNotification(notification, today);
+                
+                // Reset read states for all target users so notification appears as "new"
+                resetReadStatesForNotification(notification);
                 
                 // Only mark as processed after successful TODO creation
                 markOccurrenceProcessed(notification.getId(), today, todosCreated);
@@ -205,7 +214,7 @@ public class RecurringActionTodoService {
                     notification.getId()            // Source notification ID
                 );
                 
-                todoTaskRepository.save(task);
+                todoTaskRepository.saveAndFlush(task);
                 successCount++;
                 logger.debug("Created TODO task for user {} from notification {}", username, notification.getId());
                 
@@ -246,6 +255,28 @@ public class RecurringActionTodoService {
                 notificationId, occurrenceDate, todosCreated);
         } catch (Exception e) {
             throw new OccurrenceTrackingException(notificationId, occurrenceDate, e);
+        }
+    }
+
+    /**
+     * Resets read state for all target users of a notification.
+     * For global notifications: resets all existing UserNotificationState records.
+     * For targeted notifications: resets states for target users only.
+     * 
+     * This method handles failures gracefully - if the reset fails, it logs the error
+     * and continues processing (non-blocking).
+     * 
+     * @param notification the notification to reset read states for
+     * Requirements: 1.1, 1.2, 3.2
+     */
+    public void resetReadStatesForNotification(Notification notification) {
+        try {
+            int resetCount = userNotificationStateRepository.resetReadStateForNotification(notification.getId());
+            logger.debug("Reset read state for {} users on notification {}", resetCount, notification.getId());
+        } catch (Exception e) {
+            logger.warn("Failed to reset read states for notification {}: {}", 
+                notification.getId(), e.getMessage(), e);
+            // Non-blocking: log and continue processing
         }
     }
 }

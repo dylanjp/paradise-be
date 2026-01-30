@@ -5,12 +5,19 @@ import com.dylanjohnpratt.paradise.be.model.RecurrenceRule.RecurrenceType;
 
 /**
  * DTO for recurrence rule data in notifications.
- * Supports daily, weekly, monthly, and randomized recurrence patterns.
+ * Supports daily, weekly, monthly, yearly, and randomized recurrence patterns.
  */
 public record RecurrenceRuleDTO(
     RecurrenceType type,
     Integer dayOfWeek,
-    Integer dayOfMonth
+    Integer dayOfMonth,
+    Integer month,        // For YEARLY recurrence
+    Integer startMonth,   // For RANDOM_DATE_RANGE
+    Integer startDay,     // For RANDOM_DATE_RANGE
+    Integer endMonth,     // For RANDOM_DATE_RANGE
+    Integer endDay,       // For RANDOM_DATE_RANGE
+    Integer randomMonth,  // For RANDOM_DATE_RANGE (generated random month)
+    Integer randomDay     // For RANDOM_DATE_RANGE (generated random day)
 ) {
     /**
      * Creates a RecurrenceRuleDTO from a RecurrenceRule entity.
@@ -21,7 +28,18 @@ public record RecurrenceRuleDTO(
         if (rule == null) {
             return null;
         }
-        return new RecurrenceRuleDTO(rule.getType(), rule.getDayOfWeek(), rule.getDayOfMonth());
+        return new RecurrenceRuleDTO(
+            rule.getType(),
+            rule.getDayOfWeek(),
+            rule.getDayOfMonth(),
+            rule.getMonth(),
+            rule.getStartMonth(),
+            rule.getStartDay(),
+            rule.getEndMonth(),
+            rule.getEndDay(),
+            rule.getRandomMonth(),
+            rule.getRandomDay()
+        );
     }
 
     /**
@@ -30,6 +48,18 @@ public record RecurrenceRuleDTO(
      * @return the entity
      */
     public RecurrenceRule toEntity() {
-        return new RecurrenceRule(type, dayOfWeek, dayOfMonth);
+        return new RecurrenceRule(
+            type,
+            dayOfWeek,
+            dayOfMonth,
+            false,  // randomValuesInitialized - always false from DTO
+            month,
+            startMonth,
+            startDay,
+            endMonth,
+            endDay,
+            randomMonth,
+            randomDay
+        );
     }
 }
