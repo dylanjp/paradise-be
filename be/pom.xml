@@ -10,9 +10,9 @@
 	</parent>
 	<groupId>com.dylanjohnpratt.paradise</groupId>
 	<artifactId>be</artifactId>
-	<version>0.0.1</version>
-	<name>be</name>
-	<description>Demo project for Spring Boot</description>
+	<version>0.0.2</version>
+	<name>paradise_be</name>
+	<description>Pratt's Automated Residential And Data Integration System Engine</description>
 	<properties>
 		<java.version>21</java.version>
 	</properties>
