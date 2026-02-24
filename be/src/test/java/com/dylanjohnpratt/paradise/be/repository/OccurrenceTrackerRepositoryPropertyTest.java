@@ -164,9 +164,9 @@ class OccurrenceTrackerRepositoryPropertyTest {
         @Override
         @NonNull
         public List<ProcessedOccurrence> findByNotificationId(Long notificationId) {
-            return occurrences.values().stream()
+            return requireNonNull(occurrences.values().stream()
                     .filter(o -> o.getNotificationId().equals(notificationId))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toList()));
         }
 
         @Override

@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -123,7 +124,7 @@ public class NotificationService {
     }
 
     /**
-     * Creates TODO tasks immediately for all target users of a non-recurring notification.
+     * Creates todo tasks immediately for all target users of a non-recurring notification.
      * For global notifications, creates TODOs for all active users.
      * For targeted notifications, creates TODOs for the specified target users.
      * 
@@ -140,9 +141,9 @@ public class NotificationService {
         
         for (Long userId : targetUserIds) {
             try {
-                User user = userRepository.findById(userId).orElse(null);
+                User user = userRepository.findById(Objects.requireNonNull(userId)).orElse(null);
                 if (user == null) {
-                    logger.warn("User {} not found, skipping TODO creation for notification {}", 
+                    logger.warn("User {} not found, skipping todo creation for notification {}", 
                         userId, notification.getId());
                     continue;
                 }
@@ -163,20 +164,20 @@ public class NotificationService {
                 
                 todoTaskRepository.save(task);
                 successCount++;
-                logger.debug("Created immediate TODO task for user {} from notification {}", 
+                logger.debug("Created immediate todo task for user {} from notification {}", 
                     username, notification.getId());
                 
             } catch (Exception e) {
-                logger.error("Failed to create immediate TODO for notification {} user {}: {}", 
+                logger.error("Failed to create immediate todo for notification {} user {}: {}", 
                     notification.getId(), userId, e.getMessage(), e);
             }
         }
         
-        logger.info("Created {} immediate TODO tasks for notification {}", successCount, notification.getId());
+        logger.info("Created {} immediate todo tasks for notification {}", successCount, notification.getId());
     }
 
     /**
-     * Gets all user IDs that should receive a TODO from this notification.
+     * Gets all user IDs that should receive a todo from this notification.
      * For global notifications, returns all active user IDs.
      * For targeted notifications, returns the targetUserIds set.
      * 
@@ -237,7 +238,7 @@ public class NotificationService {
      */
     @Transactional
     public Optional<Notification> getNotificationById(Long notificationId, Long userId) {
-        Optional<Notification> notificationOpt = notificationRepository.findById(notificationId);
+        Optional<Notification> notificationOpt = notificationRepository.findById(Objects.requireNonNull(notificationId));
         
         if (notificationOpt.isEmpty()) {
             return Optional.empty();
@@ -339,7 +340,7 @@ public class NotificationService {
      */
     @Transactional
     public void deleteNotification(Long notificationId) {
-        Notification notification = notificationRepository.findById(notificationId)
+        Notification notification = notificationRepository.findById(Objects.requireNonNull(notificationId))
                 .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
         
         notification.setDeleted(true);
@@ -347,7 +348,7 @@ public class NotificationService {
     }
 
     /**
-     * Converts a notification's action item to a TODO task for the specified user.
+     * Converts a notification's action item to a todo task for the specified user.
      * Validates that the notification has an action item, is not expired, and the user
      * hasn't already actioned it.
      * 
@@ -400,7 +401,7 @@ public class NotificationService {
     }
 
     /**
-     * Checks if a user has already created a TODO task from a specific notification.
+     * Checks if a user has already created a todo task from a specific notification.
      * 
      * @param notificationId the notification ID
      * @param userId the user ID (as String, matching TodoTask.userId)

@@ -157,11 +157,11 @@ public class NotificationController {
     }
 
     /**
-     * Convert a notification's action item to a TODO task.
+     * Convert a notification's action item to a todo task.
      * 
      * @param currentUser the authenticated user
      * @param id the notification ID
-     * @return the created TODO task
+     * @return the created todo task
      */
     @PostMapping("/{id}/action")
     public ResponseEntity<TodoTask> convertToTodo(
@@ -210,7 +210,7 @@ public class NotificationController {
 
     /**
      * Manually trigger processing of recurring notifications with action items.
-     * Creates TODO tasks for all due recurring notifications that haven't been processed today.
+     * Creates todo tasks for all due recurring notifications that haven't been processed today.
      * Admin only.
      * 
      * @return ProcessingResult with counts of processed notifications and created tasks

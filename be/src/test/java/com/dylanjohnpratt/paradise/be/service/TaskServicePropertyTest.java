@@ -290,15 +290,15 @@ class TaskServicePropertyTest {
     }
 
     /**
-     * Feature: task-management-api, Property 2: TODO Task Creation Integrity
-     * For any valid CreateTodoTaskRequest, when a TODO task is created, the resulting task
+     * Feature: task-management-api, Property 2: todo Task Creation Integrity
+     * For any valid CreateTodoTaskRequest, when a todo task is created, the resulting task
      * SHALL have the provided id, description, category, order, and parentId, with userId
      * set to the requesting user and completed initialized to false.
      * 
      * Validates: Requirements 2.1, 2.2, 2.3, 2.4
      */
     @Property(tries = 100)
-    @Label("Feature: task-management-api, Property 2: TODO Task Creation Integrity")
+    @Label("Feature: task-management-api, Property 2: todo Task Creation Integrity")
     void todoTaskCreationIntegrity(
             @ForAll @NotBlank @Size(max = 50) String userId,
             @ForAll @NotBlank @Size(max = 50) String taskId,
@@ -355,15 +355,15 @@ class TaskServicePropertyTest {
     }
 
     /**
-     * Feature: task-management-api, Property 4: TODO Task Update Integrity
-     * For any existing TODO task and valid UpdateTodoTaskRequest, when the task is updated,
+     * Feature: task-management-api, Property 4: todo Task Update Integrity
+     * For any existing todo task and valid UpdateTodoTaskRequest, when the task is updated,
      * only the specified fields (description, completed, order) SHALL be modified while
      * other fields remain unchanged.
      * 
      * Validates: Requirements 4.1, 4.2
      */
     @Property(tries = 100)
-    @Label("Feature: task-management-api, Property 4: TODO Task Update Integrity")
+    @Label("Feature: task-management-api, Property 4: todo Task Update Integrity")
     void todoTaskUpdateIntegrity(
             @ForAll @NotBlank @Size(max = 50) String userId,
             @ForAll @NotBlank @Size(max = 50) String taskId,
@@ -495,7 +495,7 @@ class TaskServicePropertyTest {
         assertThat(user1Tasks.getTodoTasks()).isNotEmpty();
         assertThat(user1Tasks.getDailyTasks()).isNotEmpty();
         
-        // Verify User2 cannot update User1's TODO task
+        // Verify User2 cannot update User1's todo task
         TodoTaskRequest updateTodoRequest = new TodoTaskRequest(
                 null, "modified", null, true, 999, null
         );
@@ -509,7 +509,7 @@ class TaskServicePropertyTest {
         assertThatThrownBy(() -> service.updateDailyTask(user2Id, requireNonNull(dailyTaskId), updateDailyRequest, user2Id, false))
                 .isInstanceOf(TaskNotFoundException.class);
         
-        // Verify User2 cannot delete User1's TODO task
+        // Verify User2 cannot delete User1's todo task
         assertThatThrownBy(() -> service.deleteTodoTask(user2Id, requireNonNull(todoTaskId), user2Id, false))
                 .isInstanceOf(TaskNotFoundException.class);
         

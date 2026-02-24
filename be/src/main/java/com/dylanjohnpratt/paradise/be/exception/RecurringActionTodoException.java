@@ -1,7 +1,7 @@
 package com.dylanjohnpratt.paradise.be.exception;
 
 /**
- * Base exception for recurring action TODO processing errors.
+ * Base exception for recurring action todo processing errors.
  */
 public class RecurringActionTodoException extends RuntimeException {
     

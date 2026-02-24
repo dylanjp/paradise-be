@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.*;
  * 
  * Validates: Requirements 2.1
  */
+@SuppressWarnings("null")
 class NotificationRepositoryPropertyTest {
 
     /**

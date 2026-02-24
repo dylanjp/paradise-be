@@ -9,7 +9,7 @@ import java.util.Set;
 
 /**
  * Entity representing a notification that can be targeted to specific users or broadcast globally.
- * Supports optional recurrence rules, expiration, and action items that can be converted to TODO tasks.
+ * Supports optional recurrence rules, expiration, and action items that can be converted to todo tasks.
  */
 @Entity
 @Table(name = "notifications")

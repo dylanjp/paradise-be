@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * Response DTO containing all tasks for a user.
- * TODO tasks are organized by category, Daily tasks are a flat list.
+ * todo tasks are organized by category, Daily tasks are a flat list.
  */
 public class UserTasksResponse {
     

@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import org.springframework.data.domain.Persistable;
 
 /**
- * Represents a persistent TODO task that belongs to a category and may have parent-child relationships.
- * TODO tasks are user-scoped and support hierarchical organization through the parentId field.
+ * Represents a persistent todo task that belongs to a category and may have parent-child relationships.
+ * todo tasks are user-scoped and support hierarchical organization through the parentId field.
  */
 @Entity
 @Table(name = "todo_tasks")
