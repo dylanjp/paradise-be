@@ -29,6 +29,12 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    static {
+        // Propagate SecurityContext to async threads (needed for StreamingResponseBody)
+        org.springframework.security.core.context.SecurityContextHolder
+                .setStrategyName(org.springframework.security.core.context.SecurityContextHolder.MODE_INHERITABLETHREADLOCAL);
+    }
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
 
@@ -66,6 +72,8 @@ public class SecurityConfig {
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/heartbeat").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/users/*/drives/**").authenticated()
+                .requestMatchers("/users/*/plex/**").authenticated()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

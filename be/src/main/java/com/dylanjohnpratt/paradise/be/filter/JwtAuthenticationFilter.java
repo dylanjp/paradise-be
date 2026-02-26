@@ -88,6 +88,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         filterChain.doFilter(request, response);
     }
+    /**
+     * Skip this filter on async dispatches (e.g. StreamingResponseBody).
+     * The SecurityContext is already set from the initial request.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        return "ASYNC".equals(request.getDispatcherType().name())
+                && SecurityContextHolder.getContext().getAuthentication() != null;
+    }
 
     /**
      * Extracts the JWT token from the Authorization header.
