@@ -108,7 +108,7 @@ class RecurringActionTodoIntegrationTest {
 
         // Act: Process recurring notifications
         ProcessingResult result = recurringActionTodoService.processRecurringNotifications();
-        entityManager.flush();  // Ensure TODO tasks are persisted to database
+        entityManager.flush();  // Ensure todo tasks are persisted to database
 
         // Assert: Verify processing result
         assertThat(result.notificationsProcessed()).isEqualTo(1);

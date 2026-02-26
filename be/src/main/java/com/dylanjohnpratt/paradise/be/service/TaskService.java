@@ -36,13 +36,13 @@ public class TaskService {
     }
 
     /**
-     * Retrieves all tasks (both TODO and Daily) for a specific user.
+     * Retrieves all tasks (both todo and Daily) for a specific user.
      * Returns empty collections if the user has no tasks.
      *
      * @param userId the unique identifier of the user
      * @param requestingUserId the ID of the user making the request
      * @param isAdmin whether the requesting user has admin privileges
-     * @return UserTasksResponse containing TODO tasks grouped by category and Daily tasks as a list
+     * @return UserTasksResponse containing todo tasks grouped by category and Daily tasks as a list
      */
     public UserTasksResponse getAllTasksForUser(String userId, String requestingUserId, boolean isAdmin) {
         // Users can only access their own tasks (userId in path must match authenticated user)
@@ -53,7 +53,7 @@ public class TaskService {
         List<TodoTask> userTodoTasks = todoTaskRepository.findByUserId(userId);
         List<DailyTask> userDailyTasks = dailyTaskRepository.findByUserId(userId);
         
-        // Group TODO tasks by category
+        // Group todo tasks by category
         Map<String, List<TodoTask>> groupedTodoTasks = userTodoTasks.stream()
                 .collect(Collectors.groupingBy(
                         task -> task.getCategory() != null ? task.getCategory() : "default",
@@ -64,7 +64,7 @@ public class TaskService {
     }
 
     /**
-     * Creates a new TODO task for the specified user.
+     * Creates a new todo task for the specified user.
      * Sets the userId from the path parameter and initializes completed to false.
      *
      * @param userId the unique identifier of the user
@@ -122,7 +122,7 @@ public class TaskService {
     }
 
     /**
-     * Updates an existing TODO task for the specified user.
+     * Updates an existing todo task for the specified user.
      * Only updates fields that are provided (non-null) in the request.
      * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
      *
@@ -142,11 +142,11 @@ public class TaskService {
         }
         
         TodoTask task = todoTaskRepository.findById(taskId)
-                .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
+                .orElseThrow(() -> new TaskNotFoundException("todo task not found: " + taskId));
         
         // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
-            throw new TaskNotFoundException("TODO task not found: " + taskId);
+            throw new TaskNotFoundException("todo task not found: " + taskId);
         }
         
         if (request.getDescription() != null) {
@@ -274,7 +274,7 @@ public class TaskService {
     }
 
     /**
-     * Deletes a TODO task for the specified user.
+     * Deletes a todo task for the specified user.
      * Unnests all child tasks by setting their parentId to null (orphan prevention).
      * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
      *
@@ -292,11 +292,11 @@ public class TaskService {
         }
         
         TodoTask task = todoTaskRepository.findById(taskId)
-                .orElseThrow(() -> new TaskNotFoundException("TODO task not found: " + taskId));
+                .orElseThrow(() -> new TaskNotFoundException("todo task not found: " + taskId));
         
         // Verify the task belongs to the target user
         if (!task.getUserId().equals(userId)) {
-            throw new TaskNotFoundException("TODO task not found: " + taskId);
+            throw new TaskNotFoundException("todo task not found: " + taskId);
         }
         
         // Unnest children: set parentId to null for all child tasks (orphan prevention)

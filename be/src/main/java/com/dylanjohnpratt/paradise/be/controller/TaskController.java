@@ -39,8 +39,8 @@ public class TaskController {
     }
 
     /**
-     * Retrieves all tasks (TODO and Daily) for the specified user.
-     * Returns both task types in a single response with TODO tasks grouped by category.
+     * Retrieves all tasks (todo and Daily) for the specified user.
+     * Returns both task types in a single response with todo tasks grouped by category.
      *
      * @param userId the unique identifier of the user from the path
      * @param currentUser the authenticated user
@@ -58,7 +58,7 @@ public class TaskController {
     }
 
     /**
-     * Creates a new TODO task for the specified user.
+     * Creates a new todo task for the specified user.
      * The task is associated with the user from the path and initialized with completed=false.
      *
      * @param userId the unique identifier of the user from the path
@@ -103,7 +103,7 @@ public class TaskController {
     }
 
     /**
-     * Updates an existing TODO task for the specified user.
+     * Updates an existing todo task for the specified user.
      * Only updates fields that are provided (non-null) in the request.
      * Returns 404 if the task doesn't exist or belongs to a different user.
      *
@@ -155,7 +155,7 @@ public class TaskController {
     }
 
     /**
-     * Deletes a TODO task and all its children for the specified user.
+     * Deletes a todo task and all its children for the specified user.
      * Cascade deletes all tasks that have the deleted task's id as their parentId.
      * Returns 404 if the task doesn't exist or belongs to a different user.
      *

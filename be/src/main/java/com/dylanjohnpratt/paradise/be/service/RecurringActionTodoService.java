@@ -23,12 +23,13 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Service for processing recurring notifications with action items and creating TODO tasks.
+ * Service for processing recurring notifications with action items and creating todo tasks.
  * Handles discovery of due notifications, creation of tasks for target users, and occurrence tracking.
  * 
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 5.1, 5.2, 5.3, 5.4
@@ -62,14 +63,14 @@ public class RecurringActionTodoService {
 
     /**
      * Processes all recurring notifications with action items that are due today.
-     * Creates TODO tasks for all targeted users and marks occurrences as processed.
+     * Creates todo tasks for all targeted users and marks occurrences as processed.
      * 
      * @return ProcessingResult containing counts of processed notifications and created tasks
      */
     @Transactional
     public ProcessingResult processRecurringNotifications() {
         LocalDate today = LocalDate.now();
-        logger.info("Starting recurring action TODO processing for date: {}", today);
+        logger.info("Starting recurring action todo processing for date: {}", today);
 
         List<Notification> dueNotifications = findDueNotifications(today);
         logger.info("Found {} notifications due for processing", dueNotifications.size());
@@ -86,11 +87,11 @@ public class RecurringActionTodoService {
                 // Reset read states for all target users so notification appears as "new"
                 resetReadStatesForNotification(notification);
                 
-                // Only mark as processed after successful TODO creation
+                // Only mark as processed after successful todo creation
                 markOccurrenceProcessed(notification.getId(), today, todosCreated);
                 
                 result = result.addNotification(todosCreated);
-                logger.info("Created {} TODO tasks for notification {}", todosCreated, notification.getId());
+                logger.info("Created {} todo tasks for notification {}", todosCreated, notification.getId());
                 
             } catch (Exception e) {
                 String errorMessage = "Failed to process notification " + notification.getId() + ": " + e.getMessage();
@@ -99,7 +100,7 @@ public class RecurringActionTodoService {
             }
         }
 
-        logger.info("Completed recurring action TODO processing. Notifications: {}, TODOs created: {}, Errors: {}",
+        logger.info("Completed recurring action todo processing. Notifications: {}, TODOs created: {}, Errors: {}",
             result.notificationsProcessed(), result.todosCreated(), result.errors());
 
         return result;
@@ -148,7 +149,7 @@ public class RecurringActionTodoService {
     }
 
     /**
-     * Gets all user IDs that should receive a TODO from this notification.
+     * Gets all user IDs that should receive a todo from this notification.
      * For global notifications, returns all active user IDs.
      * For targeted notifications, returns the targetUserIds set.
      * 
@@ -169,7 +170,7 @@ public class RecurringActionTodoService {
     }
 
     /**
-     * Creates TODO tasks for all target users of a notification.
+     * Creates todo tasks for all target users of a notification.
      * Handles individual user failures gracefully.
      * 
      * @param notification the notification to create tasks from
@@ -181,7 +182,7 @@ public class RecurringActionTodoService {
         ActionItem actionItem = notification.getActionItem();
         
         if (actionItem == null || actionItem.getDescription() == null || actionItem.getDescription().isBlank()) {
-            logger.warn("Notification {} has no valid action item, skipping TODO creation", notification.getId());
+            logger.warn("Notification {} has no valid action item, skipping todo creation", notification.getId());
             return 0;
         }
         
@@ -192,10 +193,9 @@ public class RecurringActionTodoService {
         
         for (Long userId : targetUserIds) {
             try {
-                // Look up the user to get their username (tasks are stored by username, not numeric ID)
-                User user = userRepository.findById(userId).orElse(null);
+                User user = userRepository.findById(Objects.requireNonNull(userId)).orElse(null);
                 if (user == null) {
-                    logger.warn("User {} not found, skipping TODO creation for notification {}", 
+                    logger.warn("User {} not found, skipping todo creation for notification {}", 
                         userId, notification.getId());
                     continue;
                 }
@@ -216,11 +216,11 @@ public class RecurringActionTodoService {
                 
                 todoTaskRepository.saveAndFlush(task);
                 successCount++;
-                logger.debug("Created TODO task for user {} from notification {}", username, notification.getId());
+                logger.debug("Created todo task for user {} from notification {}", username, notification.getId());
                 
             } catch (Exception e) {
                 // Handle individual user failures gracefully - log and continue
-                logger.error("Failed to create TODO for notification {} user {}: {}", 
+                logger.error("Failed to create todo for notification {} user {}: {}", 
                     notification.getId(), userId, e.getMessage(), e);
                 throw new TodoCreationException(notification.getId(), userId, e);
             }

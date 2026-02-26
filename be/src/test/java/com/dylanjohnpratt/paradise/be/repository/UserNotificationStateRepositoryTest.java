@@ -12,7 +12,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -122,7 +121,6 @@ class UserNotificationStateRepositoryTest {
         // States for notification2 - these should NOT be affected
         UserNotificationState state1ForNotif2 = new UserNotificationState(notification2.getId(), user1.getId());
         state1ForNotif2.markAsRead();
-        LocalDateTime notif2ReadAt = state1ForNotif2.getReadAt();
         userNotificationStateRepository.save(state1ForNotif2);
 
         UserNotificationState state2ForNotif2 = new UserNotificationState(notification2.getId(), user3.getId());

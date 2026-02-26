@@ -13,35 +13,35 @@ import java.util.List;
 public interface TodoTaskRepository extends JpaRepository<TodoTask, String> {
     
     /**
-     * Finds all TODO tasks for a specific user.
+     * Finds all todo tasks for a specific user.
      *
      * @param userId the user ID
-     * @return list of TODO tasks for the user
+     * @return list of todo tasks for the user
      */
     List<TodoTask> findByUserId(String userId);
     
     /**
-     * Finds all TODO tasks for a specific user and category.
+     * Finds all todo tasks for a specific user and category.
      *
      * @param userId the user ID
      * @param category the category
-     * @return list of TODO tasks for the user in the category
+     * @return list of todo tasks for the user in the category
      */
     List<TodoTask> findByUserIdAndCategory(String userId, String category);
     
     /**
-     * Finds all TODO tasks for a specific user that have the given parentId.
+     * Finds all todo tasks for a specific user that have the given parentId.
      * Used for finding child tasks when a parent task is deleted (orphan prevention).
      *
      * @param userId the user ID
      * @param parentId the parent task ID
-     * @return list of TODO tasks that are children of the specified parent
+     * @return list of todo tasks that are children of the specified parent
      */
     List<TodoTask> findByUserIdAndParentId(String userId, String parentId);
     
     /**
-     * Checks if a TODO task exists for a specific user that was created from a specific notification.
-     * Used to prevent duplicate TODO creation from the same notification.
+     * Checks if a todo task exists for a specific user that was created from a specific notification.
+     * Used to prevent duplicate todo creation from the same notification.
      *
      * @param userId the user ID
      * @param sourceNotificationId the source notification ID

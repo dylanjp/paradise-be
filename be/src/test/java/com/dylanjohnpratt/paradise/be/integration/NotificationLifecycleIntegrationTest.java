@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Integration tests for notification lifecycle.
- * Tests the complete flow: create → read → mark as read → action → verify TODO.
+ * Tests the complete flow: create → read → mark as read → action → verify todo.
  * 
  * Validates: All notification-related requirements
  */
@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 @ActiveProfiles("test")
+@SuppressWarnings("null")
 class NotificationLifecycleIntegrationTest {
 
     @Autowired
@@ -66,9 +67,7 @@ class NotificationLifecycleIntegrationTest {
     private String adminToken;
     private String user1Token;
     private String user2Token;
-    private Long adminId;
     private Long user1Id;
-    private Long user2Id;
     private String user1Username;
     private String user2Username;
 
@@ -85,13 +84,12 @@ class NotificationLifecycleIntegrationTest {
         user2Username = "notifuser2_" + uniqueSuffix;
         
         // Create admin user (or reuse existing admin from DataInitializer)
-        User admin = userRepository.findByUsername("admin")
+        userRepository.findByUsername("admin")
                 .orElseGet(() -> {
                     User newAdmin = new User("admin", passwordEncoder.encode("adminpass"), 
                             Set.of("ROLE_ADMIN", "ROLE_USER"));
                     return userRepository.save(newAdmin);
                 });
-        adminId = admin.getId();
 
         // Create regular users with unique names
         User user1 = new User(user1Username, passwordEncoder.encode("user1pass"), 
@@ -102,7 +100,6 @@ class NotificationLifecycleIntegrationTest {
         User user2 = new User(user2Username, passwordEncoder.encode("user2pass"), 
                 Set.of("ROLE_USER"));
         user2 = userRepository.save(user2);
-        user2Id = user2.getId();
 
         // Get tokens
         adminToken = obtainToken("admin", "adminpass");
@@ -125,7 +122,7 @@ class NotificationLifecycleIntegrationTest {
 
 
     @Test
-    @DisplayName("Complete notification lifecycle: create → read → mark as read → action → verify TODO")
+    @DisplayName("Complete notification lifecycle: create → read → mark as read → action → verify todo")
     void completeNotificationLifecycle() throws Exception {
         // Step 1: Admin creates a notification with action item targeting user1
         CreateNotificationRequest createRequest = new CreateNotificationRequest(
@@ -170,8 +167,8 @@ class NotificationLifecycleIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isRead").value(true));
 
-        // Step 4: User1 converts the action item to a TODO task
-        MvcResult actionResult = mockMvc.perform(post("/api/notifications/{id}/action", notificationId)
+        // Step 4: User1 converts the action item to a todo task
+        mockMvc.perform(post("/api/notifications/{id}/action", notificationId)
                 .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.description").value("Update profile information"))
@@ -259,15 +256,11 @@ class NotificationLifecycleIntegrationTest {
                 null
         );
 
-        MvcResult expiredResult = mockMvc.perform(post("/api/notifications")
+        mockMvc.perform(post("/api/notifications")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(expiredRequest)))
-                .andExpect(status().isCreated())
-                .andReturn();
-
-        Long expiredNotificationId = objectMapper.readTree(expiredResult.getResponse().getContentAsString())
-                .get("id").asLong();
+                .andExpect(status().isCreated());
 
         // Create a non-expired notification
         CreateNotificationRequest activeRequest = new CreateNotificationRequest(

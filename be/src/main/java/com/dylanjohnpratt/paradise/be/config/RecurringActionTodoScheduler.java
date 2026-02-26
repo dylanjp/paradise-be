@@ -12,10 +12,10 @@ import java.time.LocalDateTime;
 
 /**
  * Scheduler component that processes recurring notifications with action items
- * and creates TODO tasks for targeted users.
+ * and creates todo tasks for targeted users.
  * 
  * Runs daily at a configurable time (default: 01:00 AM) to process all due
- * recurring notifications and create corresponding TODO tasks.
+ * recurring notifications and create corresponding todo tasks.
  * 
  * Requirements: 4.1, 4.2, 4.3, 4.4
  */
@@ -35,19 +35,19 @@ public class RecurringActionTodoScheduler {
      * Default schedule: 01:00 AM daily.
      * 
      * Logs start time, processes all due recurring notifications with action items,
-     * creates TODO tasks for targeted users, and logs completion with result counts.
+     * creates todo tasks for targeted users, and logs completion with result counts.
      */
     @Scheduled(cron = "${recurring.action.todo.cron:0 0 1 * * *}")
     @Transactional
     public void processRecurringNotifications() {
         LocalDateTime startTime = LocalDateTime.now();
-        logger.info("Starting recurring action TODO processing at {}", startTime);
+        logger.info("Starting recurring action todo processing at {}", startTime);
 
         try {
             ProcessingResult result = recurringActionTodoService.processRecurringNotifications();
 
             LocalDateTime endTime = LocalDateTime.now();
-            logger.info("Completed recurring action TODO processing at {}. " +
+            logger.info("Completed recurring action todo processing at {}. " +
                     "Notifications processed: {}, TODOs created: {}, Errors: {}",
                     endTime, result.notificationsProcessed(), result.todosCreated(), result.errors());
 
@@ -57,7 +57,7 @@ public class RecurringActionTodoScheduler {
             }
 
         } catch (Exception e) {
-            logger.error("Fatal error during recurring action TODO processing: {}", e.getMessage(), e);
+            logger.error("Fatal error during recurring action todo processing: {}", e.getMessage(), e);
         }
     }
 }

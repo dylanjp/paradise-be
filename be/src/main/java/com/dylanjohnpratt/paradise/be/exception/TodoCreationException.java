@@ -1,7 +1,7 @@
 package com.dylanjohnpratt.paradise.be.exception;
 
 /**
- * Exception thrown when TODO task creation fails for a specific notification and user.
+ * Exception thrown when todo task creation fails for a specific notification and user.
  */
 public class TodoCreationException extends RecurringActionTodoException {
     
@@ -9,7 +9,7 @@ public class TodoCreationException extends RecurringActionTodoException {
     private final Long userId;
     
     public TodoCreationException(Long notificationId, Long userId, Throwable cause) {
-        super("Failed to create TODO for notification " + notificationId + 
+        super("Failed to create todo for notification " + notificationId + 
               " and user " + userId, cause);
         this.notificationId = notificationId;
         this.userId = userId;

@@ -56,8 +56,8 @@ class RecurringActionTodoServicePropertyTest {
     /**
      * Feature: recurring-action-todo, Property 7: Target User Task Creation
      * For any recurring notification being processed:
-     * - If the notification is global, the number of TODO tasks created SHALL equal the number of active users in the system
-     * - If the notification is user-specific, TODO tasks SHALL be created exactly for the users in targetUserIds and no others
+     * - If the notification is global, the number of todo tasks created SHALL equal the number of active users in the system
+     * - If the notification is user-specific, todo tasks SHALL be created exactly for the users in targetUserIds and no others
      * 
      * Validates: Requirements 3.1, 3.2, 3.3
      */
@@ -152,7 +152,7 @@ class RecurringActionTodoServicePropertyTest {
         for (int i = numActiveUsers + 1; i <= numActiveUsers + numInactiveUsers; i++) {
             final String inactiveUsername = "user" + i;
             assertThat(allTasks)
-                .as("No TODO should be created for inactive user %s", inactiveUsername)
+                .as("No todo should be created for inactive user %s", inactiveUsername)
                 .noneMatch(task -> task.getUserId().equals(inactiveUsername));
         }
     }
@@ -618,9 +618,9 @@ class RecurringActionTodoServicePropertyTest {
      * Feature: recurring-action-todo, Property 10: Processing Idempotency
      * For any recurring notification and occurrence date, running the scheduler N times (where N >= 1)
      * SHALL produce the same final state as running it exactly once:
-     * - The same set of TODO tasks SHALL exist
+     * - The same set of todo tasks SHALL exist
      * - Exactly one ProcessedOccurrence record SHALL exist for that notification and date
-     * - An occurrence SHALL only be marked as processed after all TODO tasks for that occurrence are successfully created
+     * - An occurrence SHALL only be marked as processed after all todo tasks for that occurrence are successfully created
      * 
      * Validates: Requirements 5.1, 5.4, 5.5
      */
@@ -671,10 +671,10 @@ class RecurringActionTodoServicePropertyTest {
             .as("Exactly one ProcessedOccurrence record should exist after %d runs", numRuns)
             .hasSize(1);
         
-        // Verify: the same set of TODO tasks exists (no duplicates)
+        // Verify: the same set of todo tasks exists (no duplicates)
         List<TodoTask> allTasks = ctx.todoRepo.findAll();
         assertThat(allTasks)
-            .as("Number of TODO tasks should equal number of active users (no duplicates)")
+            .as("Number of todo tasks should equal number of active users (no duplicates)")
             .hasSize(numActiveUsers);
         
         // Verify: TODOs were created for exactly the active users
@@ -703,7 +703,7 @@ class RecurringActionTodoServicePropertyTest {
     /**
      * Feature: recurring-action-todo, Property 9: Error Resilience
      * For any set of notifications being processed where some operations fail:
-     * - If TODO creation fails for one user, TODO tasks SHALL still be created for other users of the same notification
+     * - If todo creation fails for one user, todo tasks SHALL still be created for other users of the same notification
      * - If processing fails for one notification, other notifications SHALL still be processed
      * - The total number of successfully created tasks SHALL equal the sum of tasks created for all non-failing operations
      * 

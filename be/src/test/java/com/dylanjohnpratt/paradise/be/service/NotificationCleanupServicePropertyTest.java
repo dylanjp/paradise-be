@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.*;
  * 
  * Validates: Requirements 5.6
  */
+@SuppressWarnings("null")
 class NotificationCleanupServicePropertyTest {
 
     /**
@@ -86,10 +87,6 @@ class NotificationCleanupServicePropertyTest {
                 stateRepo.save(state);
             }
         }
-
-        // Record initial counts
-        int initialNotificationCount = (int) notificationRepo.count();
-        int initialStateCount = (int) stateRepo.count();
 
         // Execute cleanup
         int deletedCount = cleanupService.purgeExpiredNotifications(retentionDays);

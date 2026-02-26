@@ -652,7 +652,7 @@ class NotificationServiceReadStatePropertyTest {
 
 
 /**
- * Property-based tests for NotificationService TODO integration functionality.
+ * Property-based tests for NotificationService todo integration functionality.
  * Uses in-memory repositories for testing.
  * 
  * Validates: Requirements 6.2, 6.3, 6.4, 6.5, 6.6
@@ -673,14 +673,14 @@ class NotificationServiceTodoIntegrationPropertyTest {
     }
 
     /**
-     * Feature: notification-service, Property 21: Action Item to TODO Creation
+     * Feature: notification-service, Property 21: Action Item to todo Creation
      * For any notification with an action item that is actioned by a user, a TodoTask
      * SHALL be created for that user with the action item's description and category.
      * 
      * Validates: Requirements 6.2
      */
     @Property(tries = 100)
-    @Label("Feature: notification-service, Property 21: Action Item to TODO Creation")
+    @Label("Feature: notification-service, Property 21: Action Item to todo Creation")
     void actionItemToTodoCreation(
             @ForAll("validSubjects") String subject,
             @ForAll("validMessageBodies") String messageBody,
@@ -697,7 +697,7 @@ class NotificationServiceTodoIntegrationPropertyTest {
         Notification notification = service.createNotification(
                 subject, messageBody, true, null, null, null, actionItem);
 
-        // Convert action item to TODO
+        // Convert action item to todo
         String userIdString = String.valueOf(userId);
         TodoTask task = service.convertActionItemToTodo(notification.getId(), userId, userIdString);
 
@@ -718,14 +718,14 @@ class NotificationServiceTodoIntegrationPropertyTest {
     }
 
     /**
-     * Feature: notification-service, Property 22: TODO Notification Provenance
+     * Feature: notification-service, Property 22: todo Notification Provenance
      * For any TodoTask created from a notification action, the task SHALL have
      * createdFromNotification=true AND sourceNotificationId set to the originating notification's ID.
      * 
      * Validates: Requirements 6.3, 6.4, 7.4
      */
     @Property(tries = 100)
-    @Label("Feature: notification-service, Property 22: TODO Notification Provenance")
+    @Label("Feature: notification-service, Property 22: todo Notification Provenance")
     void todoNotificationProvenance(
             @ForAll("validSubjects") String subject,
             @ForAll("validMessageBodies") String messageBody,
@@ -742,7 +742,7 @@ class NotificationServiceTodoIntegrationPropertyTest {
         Notification notification = service.createNotification(
                 subject, messageBody, true, null, null, null, actionItem);
 
-        // Convert action item to TODO
+        // Convert action item to todo
         String userIdString = String.valueOf(userId);
         TodoTask task = service.convertActionItemToTodo(notification.getId(), userId, userIdString);
 
@@ -757,7 +757,7 @@ class NotificationServiceTodoIntegrationPropertyTest {
 
     /**
      * Feature: notification-service, Property 23: Expired Notification Action Prevention
-     * For any expired notification with an action item, attempting to convert to TODO
+     * For any expired notification with an action item, attempting to convert to todo
      * SHALL be rejected.
      * 
      * Validates: Requirements 6.5
@@ -781,10 +781,10 @@ class NotificationServiceTodoIntegrationPropertyTest {
         Notification notification = service.createNotification(
                 subject, messageBody, true, null, expiredTime, null, actionItem);
 
-        // Attempt to convert action item to TODO should fail
+        // Attempt to convert action item to todo should fail
         String userIdString = String.valueOf(userId);
         assertThatThrownBy(() -> service.convertActionItemToTodo(notification.getId(), userId, userIdString))
-                .as("Converting expired notification to TODO should throw exception")
+                .as("Converting expired notification to todo should throw exception")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("expired");
     }

@@ -8,7 +8,7 @@ import java.util.Objects;
 
 /**
  * Entity tracking which recurring notification occurrences have been processed
- * to prevent duplicate TODO task creation.
+ * to prevent duplicate todo task creation.
  */
 @Entity
 @Table(name = "processed_occurrences",

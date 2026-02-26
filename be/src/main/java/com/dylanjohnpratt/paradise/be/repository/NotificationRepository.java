@@ -82,7 +82,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /**
      * Finds all active recurring notifications that have action items.
      * Used by the RecurringActionTodoService to identify notifications that should
-     * generate TODO tasks on their recurrence dates.
+     * generate todo tasks on their recurrence dates.
      * 
      * Filters for:
      * - Not deleted (deleted = false)

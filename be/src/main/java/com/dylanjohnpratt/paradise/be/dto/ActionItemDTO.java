@@ -4,7 +4,7 @@ import com.dylanjohnpratt.paradise.be.model.ActionItem;
 
 /**
  * DTO for action item data in notifications.
- * Represents an optional component that can generate a TODO task when actioned.
+ * Represents an optional component that can generate a todo task when actioned.
  */
 public record ActionItemDTO(
     String description,
