@@ -56,10 +56,10 @@ class AutoProvisionMyDrivePropertyTest {
             @ForAll("numericUserIds") Long userId) throws IOException {
 
         tempDir = Files.createTempDirectory("autoprovision-test-");
-        String userIdStr = userId.toString();
+        String username = "user" + userId;
 
         // Verify the per-user directory does not exist yet
-        Path userDir = tempDir.resolve(userIdStr);
+        Path userDir = tempDir.resolve(username);
         assertThat(userDir).doesNotExist();
 
         // Configure DrivePathProperties with myDrive pointing to temp dir
@@ -78,8 +78,8 @@ class AutoProvisionMyDrivePropertyTest {
         User user = new User("user" + userId, "password", Set.of());
         user.setId(userId);
 
-        // Call getDriveContents with driveKey="myDrive"
-        Map<String, DriveItem> flatMap = service.getDriveContents(userIdStr, "myDrive", user);
+        // Call getDriveContents with driveKey="myDrive" using the username
+        Map<String, DriveItem> flatMap = service.getDriveContents(username, "myDrive", user);
 
         // (a) The per-user directory now exists on the filesystem
         assertThat(userDir).exists().isDirectory();

@@ -45,21 +45,21 @@ class MyDriveServiceCheckPermissionTest {
     @Test
     void checkPermission_myDrive_ownerAllowed() {
         User user = createUser(1L, Set.of());
-        assertThatCode(() -> service.checkPermission(DriveKey.myDrive, "1", user, false))
+        assertThatCode(() -> service.checkPermission(DriveKey.myDrive, "testuser", user, false))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void checkPermission_myDrive_ownerWriteAllowed() {
         User user = createUser(1L, Set.of());
-        assertThatCode(() -> service.checkPermission(DriveKey.myDrive, "1", user, true))
+        assertThatCode(() -> service.checkPermission(DriveKey.myDrive, "testuser", user, true))
                 .doesNotThrowAnyException();
     }
 
     @Test
     void checkPermission_myDrive_nonOwnerDenied() {
         User user = createUser(2L, Set.of());
-        assertThatThrownBy(() -> service.checkPermission(DriveKey.myDrive, "1", user, false))
+        assertThatThrownBy(() -> service.checkPermission(DriveKey.myDrive, "differentuser", user, false))
                 .isInstanceOf(DriveAccessDeniedException.class);
     }
 

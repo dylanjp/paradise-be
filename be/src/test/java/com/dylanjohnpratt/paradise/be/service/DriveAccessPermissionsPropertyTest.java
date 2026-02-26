@@ -22,7 +22,7 @@ class DriveAccessPermissionsPropertyTest {
     );
 
     /**
-     * myDrive: allowed iff currentUser.getId().toString().equals(userId).
+     * myDrive: allowed iff currentUser.getUsername().equals(userId).
      * Validates: Requirements 2.1
      */
     @Property(tries = 100)
@@ -32,14 +32,14 @@ class DriveAccessPermissionsPropertyTest {
             @ForAll boolean isWrite) {
 
         User user = createUser(currentUserId, Set.of());
-        String userIdStr = userId.toString();
+        String username = "user" + userId;
 
         if (currentUserId.equals(userId)) {
             // Should not throw
-            service.checkPermission(DriveKey.myDrive, userIdStr, user, isWrite);
+            service.checkPermission(DriveKey.myDrive, username, user, isWrite);
         } else {
             assertThatThrownBy(() ->
-                    service.checkPermission(DriveKey.myDrive, userIdStr, user, isWrite))
+                    service.checkPermission(DriveKey.myDrive, username, user, isWrite))
                     .isInstanceOf(DriveAccessDeniedException.class);
         }
     }
@@ -113,7 +113,7 @@ class DriveAccessPermissionsPropertyTest {
 
         Set<String> roles = hasAdminRole ? Set.of("ROLE_ADMIN") : Set.of("ROLE_USER");
         User user = createUser(currentUserId, roles);
-        String userIdStr = userId.toString();
+        String username = "user" + userId;
 
         boolean shouldAllow = switch (driveKey) {
             case myDrive -> currentUserId.equals(userId);
@@ -123,10 +123,10 @@ class DriveAccessPermissionsPropertyTest {
         };
 
         if (shouldAllow) {
-            service.checkPermission(driveKey, userIdStr, user, isWrite);
+            service.checkPermission(driveKey, username, user, isWrite);
         } else {
             assertThatThrownBy(() ->
-                    service.checkPermission(driveKey, userIdStr, user, isWrite))
+                    service.checkPermission(driveKey, username, user, isWrite))
                     .isInstanceOf(DriveAccessDeniedException.class);
         }
     }
