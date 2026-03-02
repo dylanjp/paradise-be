@@ -132,7 +132,7 @@ class FlatMapStructuralIntegrityPropertyTest {
         Arbitrary<Integer> maxDepth = Arbitraries.integers().between(1, 3);
 
         return Combinators.combine(folderCount, fileCount, maxDepth)
-                .as(TreeSpec::new);
+                .as((f, fi, d) -> new TreeSpec(f, fi, d));
     }
 
     record TreeSpec(int folderCount, int fileCount, int maxDepth) {}

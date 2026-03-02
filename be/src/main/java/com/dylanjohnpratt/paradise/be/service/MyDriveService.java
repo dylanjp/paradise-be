@@ -435,9 +435,12 @@ public class MyDriveService {
                 itemMetadataRepository.flush();
 
                 List<ItemMetadata> newMetadata = existingMetadata.stream()
-                        .map(m -> new ItemMetadata(oldToNewIdMap.get(m.getItemId()), m.getDriveKey(), m.getColor()))
+                        .map(m -> new ItemMetadata(
+                                Objects.requireNonNull(oldToNewIdMap.get(m.getItemId())),
+                                m.getDriveKey(), m.getColor()))
                         .collect(Collectors.toList());
-                itemMetadataRepository.saveAll(newMetadata);
+                @SuppressWarnings({ "null", "unused" })
+                var saved = itemMetadataRepository.saveAll(newMetadata);
             }
 
             currentPath = newPath;
@@ -446,10 +449,11 @@ public class MyDriveService {
 
         // Handle color upsert
         if (request.color() != null) {
-            Optional<ItemMetadata> existing = itemMetadataRepository.findById(currentItemId);
+            Optional<ItemMetadata> existing = itemMetadataRepository.findById(Objects.requireNonNull(currentItemId));
             if (existing.isPresent()) {
-                existing.get().setColor(request.color());
-                itemMetadataRepository.save(existing.get());
+                ItemMetadata meta2 = existing.get();
+                meta2.setColor(request.color());
+                itemMetadataRepository.save(meta2);
             } else {
                 ItemMetadata metadata = new ItemMetadata(currentItemId, driveKey, request.color());
                 itemMetadataRepository.save(metadata);
@@ -476,7 +480,7 @@ public class MyDriveService {
         }
 
         String color = null;
-        Optional<ItemMetadata> meta = itemMetadataRepository.findById(currentItemId);
+        Optional<ItemMetadata> meta = itemMetadataRepository.findById(Objects.requireNonNull(currentItemId));
         if (meta.isPresent()) {
             color = meta.get().getColor();
         }
