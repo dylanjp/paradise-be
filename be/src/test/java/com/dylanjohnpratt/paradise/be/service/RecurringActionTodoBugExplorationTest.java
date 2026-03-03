@@ -52,6 +52,7 @@ class RecurringActionTodoBugExplorationTest {
         return new TestContext(service, notificationRepo, occurrenceRepo, todoRepo, userRepo, userNotificationStateRepo);
     }
 
+    @NonNull
     private Notification createNotification(long id, boolean isGlobal, Set<Long> targetUserIds, String actionDesc) {
         Notification notification = new Notification(
             "Subject " + id,
@@ -66,6 +67,7 @@ class RecurringActionTodoBugExplorationTest {
         return notification;
     }
 
+    @NonNull
     private User createUser(long id, String username) {
         User user = new User(username, "password", Set.of("ROLE_USER"));
         user.setId(id);
