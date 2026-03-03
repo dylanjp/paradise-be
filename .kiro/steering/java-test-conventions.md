@@ -30,3 +30,22 @@ When the production code uses `@Transactional(propagation = Propagation.REQUIRES
 For services that use `REQUIRES_NEW`, integration tests should:
 - NOT use `@Transactional` at the class level
 - Use `@BeforeEach` / `@AfterEach` with `deleteAll()` for cleanup instead of relying on transaction rollback
+
+## Service Constructor Changes Must Update Tests
+
+When adding a new dependency to a service constructor (e.g., adding `DriveCacheManager` to `MyDriveService`), you MUST also update all test files that directly instantiate that service with `new ServiceName(...)`.
+
+Search for all usages of the old constructor in test files and update them to include the new parameter. Tests in this project construct services directly rather than using Spring injection, so constructor signature changes will break them at compile time.
+
+To find affected tests, search for `new ServiceName(` across `be/src/test/`.
+
+When the new dependency is a simple component (like a cache manager), provide a real instance with a no-op/disabled configuration rather than a mock:
+
+```java
+// Good — real instance with caching disabled, avoids mock complexity
+new MyDriveService(metadataRepo, props,
+    new DriveCacheManager(new DriveCacheProperties(null, false, false, false, false)));
+
+// Also acceptable — mock if the dependency has complex behavior
+new MyDriveService(metadataRepo, props, mock(DriveCacheManager.class));
+```

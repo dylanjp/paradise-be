@@ -39,7 +39,7 @@ class ErrorConditionsPropertyTest {
         );
         ItemMetadataRepository metadataRepo = mock(ItemMetadataRepository.class);
         when(metadataRepo.findByDriveKey(anyString())).thenReturn(List.of());
-        return new MyDriveService(metadataRepo, props);
+        return new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
     }
 
     private User createUser() {

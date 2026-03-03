@@ -42,7 +42,7 @@ class RenameDescendantIdPropertyTest {
         when(metadataRepo.findByDriveKey(anyString())).thenReturn(List.of());
         when(metadataRepo.findById(any(String.class))).thenReturn(Optional.empty());
         when(metadataRepo.findAllById(anyCollection())).thenReturn(List.of());
-        return new MyDriveService(metadataRepo, props);
+        return new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
     }
 
     private User createUser() {

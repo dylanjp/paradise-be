@@ -19,7 +19,8 @@ class InvalidDriveKeyPropertyTest {
 
     private final MyDriveService service = new MyDriveService(
             mock(ItemMetadataRepository.class),
-            mock(DrivePathProperties.class)
+            mock(DrivePathProperties.class),
+            new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false))
     );
 
     /**

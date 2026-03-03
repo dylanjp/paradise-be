@@ -72,7 +72,7 @@ class AutoProvisionMyDrivePropertyTest {
         );
         ItemMetadataRepository metadataRepo = mock(ItemMetadataRepository.class);
         when(metadataRepo.findByDriveKey(anyString())).thenReturn(List.of());
-        MyDriveService service = new MyDriveService(metadataRepo, props);
+        MyDriveService service = new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
 
         // Create user with id matching the userId
         User user = new User("user" + userId, "password", Set.of());

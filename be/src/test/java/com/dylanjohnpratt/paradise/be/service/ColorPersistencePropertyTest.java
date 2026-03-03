@@ -74,7 +74,7 @@ class ColorPersistencePropertyTest {
                 "/unused/mediaCache",
                 "/unused/plexUpload"
         );
-        MyDriveService service = new MyDriveService(metadataRepo, props);
+        MyDriveService service = new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
 
         User user = new User("testuser", "password", Set.of());
         user.setId(1L);

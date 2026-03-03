@@ -3,6 +3,7 @@ package com.dylanjohnpratt.paradise.be.service;
 import com.dylanjohnpratt.paradise.be.config.DrivePathProperties;
 import com.dylanjohnpratt.paradise.be.dto.CreateFolderRequest;
 import com.dylanjohnpratt.paradise.be.dto.DriveItem;
+import com.dylanjohnpratt.paradise.be.dto.MoveRequest;
 import com.dylanjohnpratt.paradise.be.dto.PlexUploadResponse;
 import com.dylanjohnpratt.paradise.be.dto.UpdateItemRequest;
 import com.dylanjohnpratt.paradise.be.exception.DownloadFolderException;
@@ -16,6 +17,8 @@ import com.dylanjohnpratt.paradise.be.model.DriveKey;
 import com.dylanjohnpratt.paradise.be.model.ItemMetadata;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.ItemMetadataRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,16 +35,20 @@ import java.util.stream.Stream;
 @Service
 public class MyDriveService {
 
+    private static final Logger log = LoggerFactory.getLogger(MyDriveService.class);
+
     private static final long KB = 1024L;
     private static final long MB = KB * 1024;
     private static final long GB = MB * 1024;
 
     private final ItemMetadataRepository itemMetadataRepository;
     private final DrivePathProperties drivePathProperties;
+    private final DriveCacheManager driveCacheManager;
 
-    public MyDriveService(ItemMetadataRepository itemMetadataRepository, DrivePathProperties drivePathProperties) {
+    public MyDriveService(ItemMetadataRepository itemMetadataRepository, DrivePathProperties drivePathProperties, DriveCacheManager driveCacheManager) {
         this.itemMetadataRepository = itemMetadataRepository;
         this.drivePathProperties = drivePathProperties;
+        this.driveCacheManager = driveCacheManager;
     }
 
     // -----------------------------------------------------------------------
@@ -168,6 +175,18 @@ public class MyDriveService {
             throw new DriveUnavailableException("Drive path is not accessible: " + driveKey);
         }
 
+        // Cache lookup
+        try {
+            if (driveCacheManager.isEnabled(driveKey)) {
+                Optional<Map<String, DriveItem>> cached = driveCacheManager.get(userId, driveKey);
+                if (cached.isPresent()) {
+                    return cached.get();
+                }
+            }
+        } catch (Exception e) {
+            log.error("Cache lookup failed for userId={}, driveKey={}, falling back to traversal", userId, driveKey, e);
+        }
+
         Path normalizedRoot = drivePath.toAbsolutePath().normalize();
 
         Map<String, DriveItem> flatMap = new LinkedHashMap<>();
@@ -253,6 +272,15 @@ public class MyDriveService {
             }
         }
 
+        // Cache store
+        try {
+            if (driveCacheManager.isEnabled(driveKey)) {
+                driveCacheManager.put(userId, driveKey, flatMap);
+            }
+        } catch (Exception e) {
+            log.error("Cache store failed for userId={}, driveKey={}", userId, driveKey, e);
+        }
+
         return flatMap;
     }
 
@@ -286,6 +314,8 @@ public class MyDriveService {
         Path relativePath = normalizedRoot.relativize(newFolderPath.toAbsolutePath().normalize());
         String relativeStr = relativePath.toString().replace('\\', '/');
         String id = generateItemId(driveKey, relativeStr);
+
+        driveCacheManager.invalidate(userId, driveKey);
 
         return new DriveItem(id, request.name(), "folder", null, null, null, List.of(), request.parentId());
     }
@@ -332,6 +362,8 @@ public class MyDriveService {
         Path relativePath = normalizedRoot.relativize(targetPath.toAbsolutePath().normalize());
         String relativeStr = relativePath.toString().replace('\\', '/');
         String id = generateItemId(driveKey, relativeStr);
+
+        driveCacheManager.invalidate(userId, driveKey);
 
         return new DriveItem(id, fileName, "file", fileType, size, null, List.of(), parentId);
     }
@@ -507,6 +539,8 @@ public class MyDriveService {
             }
         }
 
+        driveCacheManager.invalidate(userId, driveKey);
+
         return new DriveItem(currentItemId, name, type, fileType, size, color, children, parentId);
     }
 
@@ -574,6 +608,107 @@ public class MyDriveService {
         if (!idsToDelete.isEmpty()) {
             itemMetadataRepository.deleteByItemIdIn(idsToDelete);
         }
+
+        driveCacheManager.invalidate(userId, driveKey);
+    }
+
+    // -----------------------------------------------------------------------
+    // Move item
+    // -----------------------------------------------------------------------
+
+    public DriveItem moveItem(String userId, String driveKey, String itemId,
+                              MoveRequest request, User currentUser) {
+        // 1. Parse key, check permissions (isWrite=true) — also rejects mediaCache writes
+        DriveKey key = DriveKey.fromString(driveKey);
+        checkPermission(key, userId, currentUser, true);
+
+        // 2. Reject if itemId is "root"
+        if ("root".equals(itemId)) {
+            throw new DriveRootDeletionException("Cannot move the drive root");
+        }
+
+        // 3. Resolve source and destination paths
+        Path drivePath = resolveDrivePath(key, userId);
+        Path normalizedRoot = drivePath.toAbsolutePath().normalize();
+
+        Path sourcePath = resolveItemPath(normalizedRoot, driveKey, itemId);
+        if (sourcePath == null || !Files.exists(sourcePath)) {
+            throw new DriveItemNotFoundException("Item not found: " + itemId);
+        }
+
+        Path destParentPath = resolveItemPath(normalizedRoot, driveKey, request.parentId());
+        if (destParentPath == null || !Files.exists(destParentPath) || !Files.isDirectory(destParentPath)) {
+            throw new DriveItemNotFoundException("Destination folder not found: " + request.parentId());
+        }
+
+        // 4. Check circular nesting: walk from destination parent up to root
+        if (Files.isDirectory(sourcePath)) {
+            Path normalizedSource = sourcePath.toAbsolutePath().normalize();
+            Path current = destParentPath.toAbsolutePath().normalize();
+            while (current != null && current.startsWith(normalizedRoot)) {
+                if (current.equals(normalizedSource)) {
+                    throw new DriveItemConflictException(
+                            "Cannot move a folder into one of its own descendants");
+                }
+                current = current.getParent();
+            }
+        }
+
+        // 5. Check name conflict in destination
+        Path targetPath = destParentPath.resolve(sourcePath.getFileName());
+        if (Files.exists(targetPath) && !targetPath.toAbsolutePath().normalize()
+                .equals(sourcePath.toAbsolutePath().normalize())) {
+            throw new DriveItemConflictException(
+                    "An item with name '" + sourcePath.getFileName() + "' already exists in the destination folder");
+        }
+
+        // 6. Perform filesystem move
+        try {
+            Files.move(sourcePath, targetPath);
+        } catch (IOException e) {
+            throw new DriveUnavailableException("Failed to move item: " + itemId);
+        }
+
+        // 7. Invalidate cache
+        driveCacheManager.invalidate(userId, driveKey);
+
+        // 8. Build and return updated DriveItem
+        Path newRelativePath = normalizedRoot.relativize(targetPath.toAbsolutePath().normalize());
+        String newRelativeStr = newRelativePath.toString().replace('\\', '/');
+        String newId = generateItemId(driveKey, newRelativeStr);
+        String name = targetPath.getFileName().toString();
+        boolean isDirectory = Files.isDirectory(targetPath);
+
+        String type = isDirectory ? "folder" : "file";
+        String fileType = null;
+        String size = null;
+
+        if (!isDirectory) {
+            int dotIndex = name.lastIndexOf('.');
+            fileType = (dotIndex >= 0 && dotIndex < name.length() - 1)
+                    ? name.substring(dotIndex + 1)
+                    : "";
+            try {
+                size = formatFileSize(Files.size(targetPath));
+            } catch (IOException e) {
+                size = "0 B";
+            }
+        }
+
+        List<String> children = List.of();
+        if (isDirectory) {
+            try (Stream<Path> directChildren = Files.list(targetPath)) {
+                children = directChildren.map(child -> {
+                    Path childRelative = normalizedRoot.relativize(child.toAbsolutePath().normalize());
+                    String childRelStr = childRelative.toString().replace('\\', '/');
+                    return generateItemId(driveKey, childRelStr);
+                }).collect(Collectors.toList());
+            } catch (IOException e) {
+                children = List.of();
+            }
+        }
+
+        return new DriveItem(newId, name, type, fileType, size, null, children, request.parentId());
     }
 
     // -----------------------------------------------------------------------
