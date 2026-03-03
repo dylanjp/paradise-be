@@ -1,7 +1,6 @@
 package com.dylanjohnpratt.paradise.be.service;
 
 import com.dylanjohnpratt.paradise.be.exception.OccurrenceTrackingException;
-import com.dylanjohnpratt.paradise.be.exception.TodoCreationException;
 import com.dylanjohnpratt.paradise.be.model.ActionItem;
 import com.dylanjohnpratt.paradise.be.model.Notification;
 import com.dylanjohnpratt.paradise.be.model.ProcessedOccurrence;
@@ -15,7 +14,10 @@ import com.dylanjohnpratt.paradise.be.repository.UserNotificationStateRepository
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -46,6 +48,14 @@ public class RecurringActionTodoService {
     private final UserRepository userRepository;
     private final UserNotificationStateRepository userNotificationStateRepository;
 
+    private RecurringActionTodoService self;
+
+    @Autowired
+    @Lazy
+    public void setSelf(RecurringActionTodoService self) {
+        this.self = self;
+    }
+
     public RecurringActionTodoService(
             NotificationRepository notificationRepository,
             OccurrenceTrackerRepository occurrenceTrackerRepository,
@@ -64,10 +74,11 @@ public class RecurringActionTodoService {
     /**
      * Processes all recurring notifications with action items that are due today.
      * Creates todo tasks for all targeted users and marks occurrences as processed.
+     * Each notification is processed in its own transaction via processSingleNotification().
      * 
      * @return ProcessingResult containing counts of processed notifications and created tasks
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public ProcessingResult processRecurringNotifications() {
         LocalDate today = LocalDate.now();
         logger.info("Starting recurring action todo processing for date: {}", today);
@@ -82,13 +93,14 @@ public class RecurringActionTodoService {
                 logger.debug("Processing notification {} with subject '{}'", 
                     notification.getId(), notification.getSubject());
                 
-                int todosCreated = createTodosForNotification(notification, today);
-                
-                // Reset read states for all target users so notification appears as "new"
-                resetReadStatesForNotification(notification);
-                
-                // Only mark as processed after successful todo creation
-                markOccurrenceProcessed(notification.getId(), today, todosCreated);
+                // Use self-injection to invoke through Spring proxy for REQUIRES_NEW propagation.
+                // Falls back to direct call when self is null (e.g., in unit tests without Spring context).
+                int todosCreated;
+                if (self != null) {
+                    todosCreated = self.processSingleNotification(notification, today);
+                } else {
+                    todosCreated = processSingleNotification(notification, today);
+                }
                 
                 result = result.addNotification(todosCreated);
                 logger.info("Created {} todo tasks for notification {}", todosCreated, notification.getId());
@@ -104,6 +116,27 @@ public class RecurringActionTodoService {
             result.notificationsProcessed(), result.todosCreated(), result.errors());
 
         return result;
+    }
+
+    /**
+     * Processes a single notification in its own transaction.
+     * Creates todo tasks for all target users, resets read states, and marks the occurrence as processed.
+     * 
+     * @param notification the notification to process
+     * @param today the current date for occurrence tracking
+     * @return number of todos created
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int processSingleNotification(Notification notification, LocalDate today) {
+        int todosCreated = createTodosForNotification(notification, today);
+        
+        // Reset read states for all target users so notification appears as "new"
+        resetReadStatesForNotification(notification);
+        
+        // Only mark as processed after successful todo creation
+        markOccurrenceProcessed(notification.getId(), today, todosCreated);
+        
+        return todosCreated;
     }
 
     /**
@@ -222,7 +255,6 @@ public class RecurringActionTodoService {
                 // Handle individual user failures gracefully - log and continue
                 logger.error("Failed to create todo for notification {} user {}: {}", 
                     notification.getId(), userId, e.getMessage(), e);
-                throw new TodoCreationException(notification.getId(), userId, e);
             }
         }
         

@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -38,7 +37,6 @@ public class RecurringActionTodoScheduler {
      * creates todo tasks for targeted users, and logs completion with result counts.
      */
     @Scheduled(cron = "${recurring.action.todo.cron:0 0 1 * * *}")
-    @Transactional
     public void processRecurringNotifications() {
         LocalDateTime startTime = LocalDateTime.now();
         logger.info("Starting recurring action todo processing at {}", startTime);

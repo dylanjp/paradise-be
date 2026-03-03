@@ -12,6 +12,7 @@ import com.dylanjohnpratt.paradise.be.repository.UserNotificationStateRepository
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import com.dylanjohnpratt.paradise.be.service.ProcessingResult;
 import com.dylanjohnpratt.paradise.be.service.RecurringActionTodoService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
@@ -33,7 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Validates: Requirements 3.1, 3.2
  */
 @SpringBootTest
-@Transactional
 @ActiveProfiles("test")
 class RecurringNotificationReadResetIntegrationTest {
 
@@ -84,6 +83,14 @@ class RecurringNotificationReadResetIntegrationTest {
         user3 = new User("resetuser3_" + uniqueSuffix,
                 passwordEncoder.encode("pass3"), Set.of("ROLE_USER"));
         user3 = userRepository.save(user3);
+    }
+
+    @AfterEach
+    void tearDown() {
+        todoTaskRepository.deleteAll();
+        occurrenceTrackerRepository.deleteAll();
+        userNotificationStateRepository.deleteAll();
+        notificationRepository.deleteAll();
     }
 
     @Test
