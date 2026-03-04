@@ -16,11 +16,14 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 // Feature: my-drive-backend, Property 11: Rename with descendant ID update
+@SuppressWarnings("null")
 class RenameDescendantIdPropertyTest {
 
     private static final String DRIVE_KEY = "sharedDrive";
@@ -37,9 +40,9 @@ class RenameDescendantIdPropertyTest {
         );
         ItemMetadataRepository metadataRepo = mock(ItemMetadataRepository.class);
         when(metadataRepo.findByDriveKey(anyString())).thenReturn(List.of());
-        when(metadataRepo.findById(anyString())).thenReturn(Optional.empty());
-        when(metadataRepo.findAllById(anyList())).thenReturn(List.of());
-        return new MyDriveService(metadataRepo, props);
+        when(metadataRepo.findById(any(String.class))).thenReturn(Optional.empty());
+        when(metadataRepo.findAllById(anyCollection())).thenReturn(List.of());
+        return new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
     }
 
     private User createUser() {

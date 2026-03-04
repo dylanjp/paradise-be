@@ -20,7 +20,7 @@ class DrivePathResolverTest {
         DrivePathProperties props = new DrivePathProperties(
             "/drives/my", "/drives/shared", "/drives/admin", "/drives/media", "/drives/plex"
         );
-        service = new MyDriveService(mock(ItemMetadataRepository.class), props);
+        service = new MyDriveService(mock(ItemMetadataRepository.class), props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
     }
 
     @Test

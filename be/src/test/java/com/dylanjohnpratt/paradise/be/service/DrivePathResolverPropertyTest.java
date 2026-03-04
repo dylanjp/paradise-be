@@ -20,7 +20,8 @@ class DrivePathResolverPropertyTest {
 
     private final MyDriveService service = new MyDriveService(
             mock(ItemMetadataRepository.class),
-            new DrivePathProperties(BASE_PATH, "/drives/shared", "/drives/admin", "/drives/media", "/drives/plex")
+            new DrivePathProperties(BASE_PATH, "/drives/shared", "/drives/admin", "/drives/media", "/drives/plex"),
+            new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false))
     );
 
     /**

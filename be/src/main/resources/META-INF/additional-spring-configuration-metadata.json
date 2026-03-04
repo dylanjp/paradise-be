@@ -1,0 +1,75 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret-key",
+      "type": "java.lang.String",
+      "description": "Secret key used for signing JWT tokens."
+    },
+    {
+      "name": "jwt.expiration-time",
+      "type": "java.lang.Long",
+      "description": "JWT token expiration time in milliseconds."
+    },
+    {
+      "name": "notification.cleanup.retention-days",
+      "type": "java.lang.Integer",
+      "description": "Number of days to retain expired notifications before permanent deletion.",
+      "defaultValue": 90
+    },
+    {
+      "name": "drive.paths.my-drive",
+      "type": "java.lang.String",
+      "description": "Filesystem path for user My Drive storage."
+    },
+    {
+      "name": "drive.paths.shared-drive",
+      "type": "java.lang.String",
+      "description": "Filesystem path for shared drive storage."
+    },
+    {
+      "name": "drive.paths.admin-drive",
+      "type": "java.lang.String",
+      "description": "Filesystem path for admin drive storage."
+    },
+    {
+      "name": "drive.paths.media-cache",
+      "type": "java.lang.String",
+      "description": "Filesystem path for media cache drive storage."
+    },
+    {
+      "name": "drive.paths.plex-upload",
+      "type": "java.lang.String",
+      "description": "Filesystem path for Plex upload directory."
+    },
+    {
+      "name": "drive.cache.ttl",
+      "type": "java.time.Duration",
+      "description": "Time-to-live for cached drive contents before staleness.",
+      "defaultValue": "PT2H"
+    },
+    {
+      "name": "drive.cache.my-drive",
+      "type": "java.lang.Boolean",
+      "description": "Enable caching for myDrive.",
+      "defaultValue": false
+    },
+    {
+      "name": "drive.cache.shared-drive",
+      "type": "java.lang.Boolean",
+      "description": "Enable caching for sharedDrive.",
+      "defaultValue": false
+    },
+    {
+      "name": "drive.cache.admin-drive",
+      "type": "java.lang.Boolean",
+      "description": "Enable caching for adminDrive.",
+      "defaultValue": false
+    },
+    {
+      "name": "drive.cache.media-cache",
+      "type": "java.lang.Boolean",
+      "description": "Enable caching for mediaCache.",
+      "defaultValue": true
+    }
+  ]
+}

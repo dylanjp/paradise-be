@@ -50,7 +50,7 @@ class FlatMapStructuralIntegrityPropertyTest {
             );
             ItemMetadataRepository metadataRepo = mock(ItemMetadataRepository.class);
             when(metadataRepo.findByDriveKey(anyString())).thenReturn(List.of());
-            MyDriveService service = new MyDriveService(metadataRepo, props);
+            MyDriveService service = new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
 
             User user = new User("testuser", "password", Set.of());
             user.setId(1L);
@@ -132,7 +132,7 @@ class FlatMapStructuralIntegrityPropertyTest {
         Arbitrary<Integer> maxDepth = Arbitraries.integers().between(1, 3);
 
         return Combinators.combine(folderCount, fileCount, maxDepth)
-                .as(TreeSpec::new);
+                .as((f, fi, d) -> new TreeSpec(f, fi, d));
     }
 
     record TreeSpec(int folderCount, int fileCount, int maxDepth) {}

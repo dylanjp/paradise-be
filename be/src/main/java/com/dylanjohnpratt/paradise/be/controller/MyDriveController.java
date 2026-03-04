@@ -2,6 +2,7 @@ package com.dylanjohnpratt.paradise.be.controller;
 
 import com.dylanjohnpratt.paradise.be.dto.CreateFolderRequest;
 import com.dylanjohnpratt.paradise.be.dto.DriveItem;
+import com.dylanjohnpratt.paradise.be.dto.MoveRequest;
 import com.dylanjohnpratt.paradise.be.dto.UpdateItemRequest;
 import com.dylanjohnpratt.paradise.be.exception.InvalidDriveKeyException;
 import com.dylanjohnpratt.paradise.be.model.DriveKey;
@@ -168,6 +169,28 @@ public class MyDriveController {
             @AuthenticationPrincipal User currentUser) {
         validateDriveKey(driveKey);
         DriveItem item = myDriveService.updateItem(userId, driveKey, itemId, request, currentUser);
+        return ResponseEntity.ok(item);
+    }
+
+    /**
+     * Moves a file or folder to a different parent folder within the drive.
+     *
+     * @param userId   the owner of the drive
+     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
+     * @param itemId   the ID of the item to move
+     * @param request  body containing the destination {@code parentId}
+     * @param currentUser the authenticated user
+     * @return 200 OK with the updated {@link DriveItem}
+     */
+    @PutMapping("/items/{itemId}/move")
+    public ResponseEntity<DriveItem> moveItem(
+            @PathVariable String userId,
+            @PathVariable String driveKey,
+            @PathVariable String itemId,
+            @Valid @RequestBody MoveRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        validateDriveKey(driveKey);
+        DriveItem item = myDriveService.moveItem(userId, driveKey, itemId, request, currentUser);
         return ResponseEntity.ok(item);
     }
 

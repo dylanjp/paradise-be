@@ -16,11 +16,13 @@ import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 // Feature: my-drive-backend, Property 12: Color persistence round trip
+@SuppressWarnings("null")
 class ColorPersistencePropertyTest {
 
     private static final String DRIVE_KEY = "sharedDrive";
@@ -54,7 +56,7 @@ class ColorPersistencePropertyTest {
 
         ItemMetadataRepository metadataRepo = mock(ItemMetadataRepository.class);
         when(metadataRepo.findByDriveKey(anyString())).thenReturn(List.of());
-        when(metadataRepo.findById(anyString())).thenAnswer(invocation -> {
+        when(metadataRepo.findById(any(String.class))).thenAnswer(invocation -> {
             String id = invocation.getArgument(0);
             return Optional.ofNullable(metadataStore.get(id));
         });
@@ -63,7 +65,7 @@ class ColorPersistencePropertyTest {
             metadataStore.put(saved.getItemId(), saved);
             return saved;
         });
-        when(metadataRepo.findAllById(any())).thenReturn(List.of());
+        when(metadataRepo.findAllById(anyList())).thenReturn(List.of());
 
         DrivePathProperties props = new DrivePathProperties(
                 "/unused/myDrive",
@@ -72,7 +74,7 @@ class ColorPersistencePropertyTest {
                 "/unused/mediaCache",
                 "/unused/plexUpload"
         );
-        MyDriveService service = new MyDriveService(metadataRepo, props);
+        MyDriveService service = new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
 
         User user = new User("testuser", "password", Set.of());
         user.setId(1L);

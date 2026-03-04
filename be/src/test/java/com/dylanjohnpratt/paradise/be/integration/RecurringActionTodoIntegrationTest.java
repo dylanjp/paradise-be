@@ -11,7 +11,7 @@ import com.dylanjohnpratt.paradise.be.repository.TodoTaskRepository;
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import com.dylanjohnpratt.paradise.be.service.ProcessingResult;
 import com.dylanjohnpratt.paradise.be.service.RecurringActionTodoService;
-import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
@@ -33,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Validates: Requirements 3.1, 3.4, 3.5
  */
 @SpringBootTest
-@Transactional
 @ActiveProfiles("test")
 class RecurringActionTodoIntegrationTest {
 
@@ -54,9 +52,6 @@ class RecurringActionTodoIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private EntityManager entityManager;
 
     private User user1;
     private User user2;
@@ -85,6 +80,13 @@ class RecurringActionTodoIntegrationTest {
         user3 = userRepository.save(user3);
     }
 
+    @AfterEach
+    void tearDown() {
+        todoTaskRepository.deleteAll();
+        occurrenceTrackerRepository.deleteAll();
+        notificationRepository.deleteAll();
+    }
+
     @Test
     @DisplayName("Happy path: recurring notification with action item creates TODOs for all target users")
     void recurringNotificationCreatesTodosForAllTargetUsers() {
@@ -102,13 +104,10 @@ class RecurringActionTodoIntegrationTest {
                 actionItem
         );
         notification = notificationRepository.save(notification);
-        entityManager.flush();  // Ensure notification and targetUserIds are persisted
-        entityManager.clear();  // Clear persistence context to force fresh load
         final Long notificationId = notification.getId();
 
         // Act: Process recurring notifications
         ProcessingResult result = recurringActionTodoService.processRecurringNotifications();
-        entityManager.flush();  // Ensure todo tasks are persisted to database
 
         // Assert: Verify processing result
         assertThat(result.notificationsProcessed()).isEqualTo(1);

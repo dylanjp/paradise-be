@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.dylanjohnpratt.paradise</groupId>
 	<artifactId>be</artifactId>
-	<version>0.0.3</version>
+	<version>0.0.4</version>
 	<name>paradise_be</name>
 	<description>Pratt's Automated Residential And Data Integration System Engine</description>
 	<properties>
@@ -89,6 +89,13 @@
 			<groupId>me.paulschwarz</groupId>
 			<artifactId>spring-dotenv</artifactId>
 			<version>4.0.0</version>
+		</dependency>
+
+		<!-- Configuration metadata generation for @ConfigurationProperties -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-configuration-processor</artifactId>
+			<optional>true</optional>
 		</dependency>
 	</dependencies>
 

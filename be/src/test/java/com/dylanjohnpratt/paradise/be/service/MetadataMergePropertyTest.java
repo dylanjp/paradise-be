@@ -63,7 +63,7 @@ class MetadataMergePropertyTest {
             );
             ItemMetadataRepository metadataRepo = mock(ItemMetadataRepository.class);
             when(metadataRepo.findByDriveKey(anyString())).thenReturn(metadataRecords);
-            MyDriveService service = new MyDriveService(metadataRepo, props);
+            MyDriveService service = new MyDriveService(metadataRepo, props, new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
 
             User user = new User("testuser", "password", Set.of());
             user.setId(1L);
@@ -104,7 +104,7 @@ class MetadataMergePropertyTest {
                 Arbitraries.integers().between(1, 4),
                 Arbitraries.integers().between(1, 4),
                 Arbitraries.integers().between(1, 3)
-        ).as(TreeSpec::new);
+        ).as((f, fi, d) -> new TreeSpec(f, fi, d));
 
         Arbitrary<List<ColorAssignment>> colors = colorAssignments().list().ofMinSize(1).ofMaxSize(8);
 
@@ -114,7 +114,7 @@ class MetadataMergePropertyTest {
     private Arbitrary<ColorAssignment> colorAssignments() {
         Arbitrary<Boolean> hasColor = Arbitraries.of(true, false);
         Arbitrary<String> color = Arbitraries.of(COLORS);
-        return Combinators.combine(hasColor, color).as(ColorAssignment::new);
+        return Combinators.combine(hasColor, color).as((h, c) -> new ColorAssignment(h, c));
     }
 
     record TestScenario(TreeSpec treeSpec, List<ColorAssignment> colorAssignments) {}

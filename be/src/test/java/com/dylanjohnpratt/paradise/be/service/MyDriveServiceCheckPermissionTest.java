@@ -22,7 +22,7 @@ class MyDriveServiceCheckPermissionTest {
     @BeforeEach
     void setUp() {
         ItemMetadataRepository repository = mock(ItemMetadataRepository.class);
-        service = new MyDriveService(repository, mock(DrivePathProperties.class));
+        service = new MyDriveService(repository, mock(DrivePathProperties.class), new DriveCacheManager(new com.dylanjohnpratt.paradise.be.config.DriveCacheProperties(null, false, false, false, false)));
     }
 
     private User createUser(Long id, Set<String> roles) {
