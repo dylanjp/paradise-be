@@ -189,88 +189,7 @@ public class MyDriveService {
 
         Path normalizedRoot = drivePath.toAbsolutePath().normalize();
 
-        Map<String, DriveItem> flatMap = new LinkedHashMap<>();
-        Map<String, List<String>> childrenMap = new HashMap<>();
-
-        try (Stream<Path> paths = Files.walk(normalizedRoot)) {
-            paths.forEach(path -> {
-                Path normalizedPath = path.toAbsolutePath().normalize();
-                if (!normalizedPath.startsWith(normalizedRoot)) {
-                    return;
-                }
-
-                Path relativePath = normalizedRoot.relativize(normalizedPath);
-                String relativeStr = relativePath.toString().replace('\\', '/');
-
-                String id = generateItemId(driveKey, relativeStr);
-                String name = normalizedPath.equals(normalizedRoot)
-                        ? normalizedRoot.getFileName().toString()
-                        : normalizedPath.getFileName().toString();
-
-                boolean isDirectory = Files.isDirectory(normalizedPath);
-                String type = isDirectory ? "folder" : "file";
-                String fileType = null;
-                String size = null;
-
-                if (!isDirectory) {
-                    String fileName = name;
-                    int dotIndex = fileName.lastIndexOf('.');
-                    fileType = (dotIndex >= 0 && dotIndex < fileName.length() - 1)
-                            ? fileName.substring(dotIndex + 1)
-                            : "";
-                    try {
-                        size = formatFileSize(Files.size(normalizedPath));
-                    } catch (IOException e) {
-                        size = "0 B";
-                    }
-                }
-
-                String parentId;
-                if (normalizedPath.equals(normalizedRoot)) {
-                    parentId = null;
-                } else {
-                    Path parentRelative = normalizedRoot.relativize(normalizedPath.getParent());
-                    String parentRelStr = parentRelative.toString().replace('\\', '/');
-                    parentId = generateItemId(driveKey, parentRelStr);
-                }
-
-                DriveItem item = new DriveItem(id, name, type, fileType, size, null,
-                        isDirectory ? new ArrayList<>() : List.of(), parentId);
-                flatMap.put(id, item);
-
-                if (parentId != null) {
-                    childrenMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(id);
-                }
-            });
-        } catch (IOException e) {
-            throw new DriveUnavailableException("Failed to read drive contents: " + driveKey);
-        }
-
-        // Populate children arrays for folders
-        for (Map.Entry<String, List<String>> entry : childrenMap.entrySet()) {
-            DriveItem parent = flatMap.get(entry.getKey());
-            if (parent != null && "folder".equals(parent.type())) {
-                DriveItem updated = new DriveItem(
-                        parent.id(), parent.name(), parent.type(), parent.fileType(),
-                        parent.size(), parent.color(), entry.getValue(), parent.parentId());
-                flatMap.put(entry.getKey(), updated);
-            }
-        }
-
-        // Merge metadata colors from database
-        List<ItemMetadata> metadataList = itemMetadataRepository.findByDriveKey(driveKey);
-        Map<String, String> colorMap = metadataList.stream()
-                .collect(Collectors.toMap(ItemMetadata::getItemId, ItemMetadata::getColor));
-
-        for (Map.Entry<String, String> colorEntry : colorMap.entrySet()) {
-            DriveItem item = flatMap.get(colorEntry.getKey());
-            if (item != null) {
-                DriveItem updated = new DriveItem(
-                        item.id(), item.name(), item.type(), item.fileType(),
-                        item.size(), colorEntry.getValue(), item.children(), item.parentId());
-                flatMap.put(colorEntry.getKey(), updated);
-            }
-        }
+        Map<String, DriveItem> flatMap = buildFlatMap(normalizedRoot, driveKey);
 
         // Cache store
         try {
@@ -752,8 +671,126 @@ public class MyDriveService {
     }
 
     // -----------------------------------------------------------------------
+    // Cache warming
+    // -----------------------------------------------------------------------
+
+    /**
+     * Walks the filesystem for a global (shared) drive and populates the cache.
+     * Used by the cache warm-up scheduler; does not perform permission checks.
+     */
+    public void warmDriveCache(String driveKey) {
+        DriveKey key = DriveKey.fromString(driveKey);
+        if (key == null) {
+            log.warn("Cannot warm cache for invalid drive key: {}", driveKey);
+            return;
+        }
+
+        Path drivePath = resolveDrivePath(key, "system");
+        if (!Files.exists(drivePath) || !Files.isDirectory(drivePath)) {
+            log.warn("Drive path not accessible for cache warming: {}", driveKey);
+            return;
+        }
+
+        Path normalizedRoot = drivePath.toAbsolutePath().normalize();
+        Map<String, DriveItem> flatMap = buildFlatMap(normalizedRoot, driveKey);
+        driveCacheManager.putGlobal(driveKey, flatMap);
+        log.info("Cache warmed for global drive: {} ({} items)", driveKey, flatMap.size());
+    }
+
+    // -----------------------------------------------------------------------
     // Internal helpers
     // -----------------------------------------------------------------------
+
+    /**
+     * Walks the filesystem at normalizedRoot and builds the flat map of DriveItems,
+     * including metadata color merge from the database.
+     */
+    private Map<String, DriveItem> buildFlatMap(Path normalizedRoot, String driveKey) {
+        Map<String, DriveItem> flatMap = new LinkedHashMap<>();
+        Map<String, List<String>> childrenMap = new HashMap<>();
+
+        try (Stream<Path> paths = Files.walk(normalizedRoot)) {
+            paths.forEach(path -> {
+                Path normalizedPath = path.toAbsolutePath().normalize();
+                if (!normalizedPath.startsWith(normalizedRoot)) {
+                    return;
+                }
+
+                Path relativePath = normalizedRoot.relativize(normalizedPath);
+                String relativeStr = relativePath.toString().replace('\\', '/');
+
+                String id = generateItemId(driveKey, relativeStr);
+                String name = normalizedPath.equals(normalizedRoot)
+                        ? normalizedRoot.getFileName().toString()
+                        : normalizedPath.getFileName().toString();
+
+                boolean isDirectory = Files.isDirectory(normalizedPath);
+                String type = isDirectory ? "folder" : "file";
+                String fileType = null;
+                String size = null;
+
+                if (!isDirectory) {
+                    String fileName = name;
+                    int dotIndex = fileName.lastIndexOf('.');
+                    fileType = (dotIndex >= 0 && dotIndex < fileName.length() - 1)
+                            ? fileName.substring(dotIndex + 1)
+                            : "";
+                    try {
+                        size = formatFileSize(Files.size(normalizedPath));
+                    } catch (IOException e) {
+                        size = "0 B";
+                    }
+                }
+
+                String parentId;
+                if (normalizedPath.equals(normalizedRoot)) {
+                    parentId = null;
+                } else {
+                    Path parentRelative = normalizedRoot.relativize(normalizedPath.getParent());
+                    String parentRelStr = parentRelative.toString().replace('\\', '/');
+                    parentId = generateItemId(driveKey, parentRelStr);
+                }
+
+                DriveItem item = new DriveItem(id, name, type, fileType, size, null,
+                        isDirectory ? new ArrayList<>() : List.of(), parentId);
+                flatMap.put(id, item);
+
+                if (parentId != null) {
+                    childrenMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(id);
+                }
+            });
+        } catch (IOException e) {
+            throw new DriveUnavailableException("Failed to read drive contents: " + driveKey);
+        }
+
+        // Populate children arrays for folders
+        for (Map.Entry<String, List<String>> entry : childrenMap.entrySet()) {
+            DriveItem parent = flatMap.get(entry.getKey());
+            if (parent != null && "folder".equals(parent.type())) {
+                DriveItem updated = new DriveItem(
+                        parent.id(), parent.name(), parent.type(), parent.fileType(),
+                        parent.size(), parent.color(), entry.getValue(), parent.parentId());
+                flatMap.put(entry.getKey(), updated);
+            }
+        }
+
+        // Merge metadata colors from database
+        List<ItemMetadata> metadataList = itemMetadataRepository.findByDriveKey(driveKey);
+        Map<String, String> colorMap = metadataList.stream()
+                .collect(Collectors.toMap(ItemMetadata::getItemId, ItemMetadata::getColor));
+
+        for (Map.Entry<String, String> colorEntry : colorMap.entrySet()) {
+            DriveItem item = flatMap.get(colorEntry.getKey());
+            if (item != null) {
+                DriveItem updated = new DriveItem(
+                        item.id(), item.name(), item.type(), item.fileType(),
+                        item.size(), colorEntry.getValue(), item.children(), item.parentId());
+                flatMap.put(colorEntry.getKey(), updated);
+            }
+        }
+
+        return flatMap;
+    }
 
     /**
      * Resolves an item ID to its filesystem path by walking the drive root.
