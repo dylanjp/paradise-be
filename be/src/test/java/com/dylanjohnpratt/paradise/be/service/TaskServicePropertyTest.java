@@ -313,7 +313,7 @@ class TaskServicePropertyTest {
                 taskId, description, category, null, order, parentId
         );
         
-        TodoTask created = service.createTodoTask(userId, request, userId, false);
+        TodoTask created = service.createTodoTask(userId, request, userId);
         
         assertThat(created.getId()).isEqualTo(taskId);
         assertThat(created.getUserId()).isEqualTo(userId);
@@ -344,7 +344,7 @@ class TaskServicePropertyTest {
         
         DailyTaskRequest request = new DailyTaskRequest(taskId, description, null, order);
         
-        DailyTask created = service.createDailyTask(userId, request, userId, false);
+        DailyTask created = service.createDailyTask(userId, request, userId);
         
         assertThat(created.getId()).isEqualTo(taskId);
         assertThat(created.getUserId()).isEqualTo(userId);
@@ -381,13 +381,13 @@ class TaskServicePropertyTest {
         TodoTaskRequest createRequest = new TodoTaskRequest(
                 taskId, originalDescription, category, null, originalOrder, parentId
         );
-        service.createTodoTask(userId, createRequest, userId, false);
-        
+        service.createTodoTask(userId, createRequest, userId);
+
         // Update the task
         TodoTaskRequest updateRequest = new TodoTaskRequest(
                 null, newDescription, null, newCompleted, newOrder, null
         );
-        TodoTask updated = service.updateTodoTask(userId, requireNonNull(taskId), updateRequest, userId, false);
+        TodoTask updated = service.updateTodoTask(userId, requireNonNull(taskId), updateRequest, userId);
         
         // Verify updated fields changed
         assertThat(updated.getDescription()).isEqualTo(newDescription);
@@ -426,14 +426,14 @@ class TaskServicePropertyTest {
         DailyTaskRequest createRequest = new DailyTaskRequest(
                 taskId, originalDescription, null, originalOrder
         );
-        DailyTask created = service.createDailyTask(userId, createRequest, userId, false);
+        DailyTask created = service.createDailyTask(userId, createRequest, userId);
         var originalCreatedAt = created.getCreatedAt();
-        
+
         // Update the task
         DailyTaskRequest updateRequest = new DailyTaskRequest(
                 null, newDescription, newCompleted, newOrder
         );
-        DailyTask updated = service.updateDailyTask(userId, requireNonNull(taskId), updateRequest, userId, false);
+        DailyTask updated = service.updateDailyTask(userId, requireNonNull(taskId), updateRequest, userId);
         
         // Verify updated fields changed
         assertThat(updated.getDescription()).isEqualTo(newDescription);
@@ -478,11 +478,11 @@ class TaskServicePropertyTest {
                 dailyTaskId, description, null, order
         );
         
-        service.createTodoTask(user1Id, todoRequest, user1Id, false);
-        service.createDailyTask(user1Id, dailyRequest, user1Id, false);
-        
+        service.createTodoTask(user1Id, todoRequest, user1Id);
+        service.createDailyTask(user1Id, dailyRequest, user1Id);
+
         // Verify User2 cannot see User1's tasks via getAllTasksForUser
-        UserTasksResponse user2Tasks = service.getAllTasksForUser(user2Id, user2Id, false);
+        UserTasksResponse user2Tasks = service.getAllTasksForUser(user2Id, user2Id);
         Map<String, List<TodoTask>> user2TodoTasks = user2Tasks.getTodoTasks();
         List<DailyTask> user2DailyTasks = user2Tasks.getDailyTasks();
         
@@ -491,7 +491,7 @@ class TaskServicePropertyTest {
         assertThat(user2DailyTasks).isEmpty();
         
         // Verify User1 can see their own tasks
-        UserTasksResponse user1Tasks = service.getAllTasksForUser(user1Id, user1Id, false);
+        UserTasksResponse user1Tasks = service.getAllTasksForUser(user1Id, user1Id);
         assertThat(user1Tasks.getTodoTasks()).isNotEmpty();
         assertThat(user1Tasks.getDailyTasks()).isNotEmpty();
         
@@ -499,26 +499,26 @@ class TaskServicePropertyTest {
         TodoTaskRequest updateTodoRequest = new TodoTaskRequest(
                 null, "modified", null, true, 999, null
         );
-        assertThatThrownBy(() -> service.updateTodoTask(user2Id, requireNonNull(todoTaskId), updateTodoRequest, user2Id, false))
+        assertThatThrownBy(() -> service.updateTodoTask(user2Id, requireNonNull(todoTaskId), updateTodoRequest, user2Id))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User2 cannot update User1's Daily task
         DailyTaskRequest updateDailyRequest = new DailyTaskRequest(
                 null, "modified", true, 999
         );
-        assertThatThrownBy(() -> service.updateDailyTask(user2Id, requireNonNull(dailyTaskId), updateDailyRequest, user2Id, false))
+        assertThatThrownBy(() -> service.updateDailyTask(user2Id, requireNonNull(dailyTaskId), updateDailyRequest, user2Id))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User2 cannot delete User1's todo task
-        assertThatThrownBy(() -> service.deleteTodoTask(user2Id, requireNonNull(todoTaskId), user2Id, false))
+        assertThatThrownBy(() -> service.deleteTodoTask(user2Id, requireNonNull(todoTaskId), user2Id))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User2 cannot delete User1's Daily task
-        assertThatThrownBy(() -> service.deleteDailyTask(user2Id, requireNonNull(dailyTaskId), user2Id, false))
+        assertThatThrownBy(() -> service.deleteDailyTask(user2Id, requireNonNull(dailyTaskId), user2Id))
                 .isInstanceOf(TaskNotFoundException.class);
         
         // Verify User1's tasks are still intact after User2's failed attempts
-        UserTasksResponse user1TasksAfter = service.getAllTasksForUser(user1Id, user1Id, false);
+        UserTasksResponse user1TasksAfter = service.getAllTasksForUser(user1Id, user1Id);
         assertThat(user1TasksAfter.getTodoTasks().get(category))
                 .anyMatch(task -> task.getId().equals(todoTaskId));
         assertThat(user1TasksAfter.getDailyTasks())
@@ -545,7 +545,7 @@ class TaskServicePropertyTest {
         
         // Create a daily task
         DailyTaskRequest createRequest = new DailyTaskRequest(taskId, description, null, 0);
-        service.createDailyTask(userId, createRequest, userId, false);
+        service.createDailyTask(userId, createRequest, userId);
         
         // Generate unique completion dates from offsets (days before today)
         LocalDate today = LocalDate.now();
@@ -566,7 +566,7 @@ class TaskServicePropertyTest {
         
         // Create the task
         DailyTaskRequest request = new DailyTaskRequest(taskId, description, null, 0);
-        testService.createDailyTask(userId, request, userId, false);
+        testService.createDailyTask(userId, request, userId);
         
         // Add completion records directly to the repository
         for (LocalDate date : expectedDates) {
@@ -575,7 +575,7 @@ class TaskServicePropertyTest {
         }
         
         // Get completion history
-        List<LocalDate> history = testService.getCompletionHistory(userId, requireNonNull(taskId), userId, false);
+        List<LocalDate> history = testService.getCompletionHistory(userId, requireNonNull(taskId), userId);
         
         // Verify all dates are returned
         assertThat(history).containsExactlyInAnyOrderElementsOf(expectedDates);
@@ -606,10 +606,10 @@ class TaskServicePropertyTest {
         
         // Create a daily task without any completions
         DailyTaskRequest createRequest = new DailyTaskRequest(taskId, description, null, 0);
-        service.createDailyTask(userId, createRequest, userId, false);
+        service.createDailyTask(userId, createRequest, userId);
         
         // Get completion history
-        List<LocalDate> history = service.getCompletionHistory(userId, requireNonNull(taskId), userId, false);
+        List<LocalDate> history = service.getCompletionHistory(userId, requireNonNull(taskId), userId);
         
         // Verify empty list is returned
         assertThat(history).isEmpty();
@@ -685,10 +685,10 @@ class TaskServicePropertyTest {
         // User2 does NOT complete their task (no perfect day for User2)
         
         // Get perfect days for User1 - should include testDate
-        List<LocalDate> user1PerfectDays = service.getPerfectDays(user1Id, year, user1Id, false);
+        List<LocalDate> user1PerfectDays = service.getPerfectDays(user1Id, year, user1Id);
         
         // Get perfect days for User2 - should be empty (task not completed)
-        List<LocalDate> user2PerfectDays = service.getPerfectDays(user2Id, year, user2Id, false);
+        List<LocalDate> user2PerfectDays = service.getPerfectDays(user2Id, year, user2Id);
         
         // Verify User1 has the perfect day
         assertThat(user1PerfectDays)
@@ -706,13 +706,13 @@ class TaskServicePropertyTest {
         completionRepo.save(user2Completion);
         
         // Re-check User1's perfect days - should still be the same
-        List<LocalDate> user1PerfectDaysAfter = service.getPerfectDays(user1Id, year, user1Id, false);
+        List<LocalDate> user1PerfectDaysAfter = service.getPerfectDays(user1Id, year, user1Id);
         assertThat(user1PerfectDaysAfter)
                 .as("User1's perfect days should not change when User2 completes their task")
                 .containsExactlyElementsOf(user1PerfectDays);
         
         // Now User2 should have a perfect day
-        List<LocalDate> user2PerfectDaysAfter = service.getPerfectDays(user2Id, year, user2Id, false);
+        List<LocalDate> user2PerfectDaysAfter = service.getPerfectDays(user2Id, year, user2Id);
         assertThat(user2PerfectDaysAfter)
                 .as("User2 should now have testDate as a perfect day")
                 .contains(testDate);
