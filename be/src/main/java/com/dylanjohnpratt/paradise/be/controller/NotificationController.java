@@ -2,7 +2,7 @@ package com.dylanjohnpratt.paradise.be.controller;
 
 import com.dylanjohnpratt.paradise.be.dto.CreateNotificationRequest;
 import com.dylanjohnpratt.paradise.be.dto.NotificationDTO;
-import com.dylanjohnpratt.paradise.be.exception.*;
+import com.dylanjohnpratt.paradise.be.exception.NotificationNotFoundException;
 import com.dylanjohnpratt.paradise.be.model.ActionItem;
 import com.dylanjohnpratt.paradise.be.model.Notification;
 import com.dylanjohnpratt.paradise.be.model.RecurrenceRule;
@@ -20,10 +20,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * REST controller for notification management.
- * Provides endpoints for listing, viewing, creating, and managing notifications.
- * 
- * Requirements: All notification-related requirements
+ * Controller for notification management.
+ * Provides endpoints for querying, creating, and managing notifications. Notifications
+ * can be global (visible to all users) or targeted to specific users. Supports read/unread
+ * state tracking per user, action item conversion to todo tasks, and admin-triggered
+ * processing of recurring notifications. Domain exceptions are handled by
+ * {@link com.dylanjohnpratt.paradise.be.exception.NotificationExceptionHandler}.
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -39,68 +41,71 @@ public class NotificationController {
     }
 
     /**
-     * Get notifications for the current user.
-     * Excludes expired notifications by default unless includeExpired=true.
-     * 
-     * @param currentUser the authenticated user
-     * @param includeExpired whether to include expired notifications (for audit)
-     * @return list of notifications visible to the user
+     * Retrieves all notifications visible to the authenticated user.
+     * Returns both global notifications and those specifically targeted to the user.
+     * Each notification includes its read/unread state for the current user.
+     *
+     * @param currentUser    the currently authenticated user, injected by Spring Security
+     * @param includeExpired whether to include expired notifications (defaults to false)
+     * @return list of notifications with per-user read state
      */
     @GetMapping
     public ResponseEntity<List<NotificationDTO>> getNotifications(
             @AuthenticationPrincipal User currentUser,
             @RequestParam(defaultValue = "false") boolean includeExpired) {
-        
+
         List<Notification> notifications = notificationService.getNotificationsForUser(
                 currentUser.getId(), includeExpired);
-        
+
         List<NotificationDTO> dtos = notifications.stream()
-                .map(n -> NotificationDTO.fromEntity(n, 
+                .map(n -> NotificationDTO.fromEntity(n,
                         notificationService.isRead(n.getId(), currentUser.getId())))
                 .toList();
-        
+
         return ResponseEntity.ok(dtos);
     }
 
     /**
-     * Get a single notification by ID.
-     * 
-     * @param currentUser the authenticated user
-     * @param id the notification ID
-     * @return the notification if found and accessible
+     * Retrieves a single notification by ID.
+     * The notification must be visible to the authenticated user (global or targeted to them).
+     *
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @param id          the notification ID
+     * @return the notification with its read state, or 404 if not found/accessible
      */
     @GetMapping("/{id}")
     public ResponseEntity<NotificationDTO> getNotification(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
-        
+
         Notification notification = notificationService.getNotificationById(id, currentUser.getId())
                 .orElseThrow(() -> new NotificationNotFoundException(id));
-        
+
         boolean isRead = notificationService.isRead(id, currentUser.getId());
         return ResponseEntity.ok(NotificationDTO.fromEntity(notification, isRead));
     }
 
     /**
-     * Create a new notification (admin only).
-     * 
+     * Creates a new notification. Requires ROLE_ADMIN.
+     * Supports global notifications (visible to all), user-targeted notifications,
+     * optional expiration, recurrence rules, and action items that users can convert to todos.
+     *
      * @param request the notification creation request
-     * @return the created notification
+     * @return the created notification as a DTO with HTTP 201 Created
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<NotificationDTO> createNotification(
             @RequestBody CreateNotificationRequest request) {
-        
-        // Convert DTOs to entities
-        RecurrenceRule recurrenceRule = request.recurrenceRule() != null 
-                ? request.recurrenceRule().toEntity() 
+
+        RecurrenceRule recurrenceRule = request.recurrenceRule() != null
+                ? request.recurrenceRule().toEntity()
                 : null;
-        
-        ActionItem actionItem = request.actionItem() != null 
-                ? request.actionItem().toEntity() 
+
+        ActionItem actionItem = request.actionItem() != null
+                ? request.actionItem().toEntity()
                 : null;
-        
+
         Notification notification = notificationService.createNotification(
                 request.subject(),
                 request.messageBody(),
@@ -110,110 +115,85 @@ public class NotificationController {
                 recurrenceRule,
                 actionItem
         );
-        
-        // New notifications are unread by default
+
         NotificationDTO dto = NotificationDTO.fromEntity(notification, false);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
     /**
-     * Mark a notification as read.
-     * 
-     * @param currentUser the authenticated user
-     * @param id the notification ID
-     * @return 204 No Content on success
+     * Marks a notification as read for the authenticated user.
+     * Creates or updates the user's read state record for this notification.
+     *
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @param id          the notification ID to mark as read
+     * @return HTTP 204 No Content on success
      */
     @PostMapping("/{id}/read")
     public ResponseEntity<Void> markAsRead(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
-        
-        try {
-            notificationService.markAsRead(id, currentUser.getId());
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            throw new NotificationNotFoundException(id);
-        }
+        notificationService.markAsRead(id, currentUser.getId());
+        return ResponseEntity.noContent().build();
     }
 
     /**
-     * Mark a notification as unread.
-     * 
-     * @param currentUser the authenticated user
-     * @param id the notification ID
-     * @return 204 No Content on success
+     * Marks a notification as unread for the authenticated user.
+     * Updates the user's read state record for this notification.
+     *
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @param id          the notification ID to mark as unread
+     * @return HTTP 204 No Content on success
      */
     @PostMapping("/{id}/unread")
     public ResponseEntity<Void> markAsUnread(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
-        
-        try {
-            notificationService.markAsUnread(id, currentUser.getId());
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            throw new NotificationNotFoundException(id);
-        }
+        notificationService.markAsUnread(id, currentUser.getId());
+        return ResponseEntity.noContent().build();
     }
 
     /**
-     * Convert a notification's action item to a todo task.
-     * 
-     * @param currentUser the authenticated user
-     * @param id the notification ID
-     * @return the created todo task
+     * Converts a notification's action item into a todo task for the authenticated user.
+     * The notification must have an action item, must not be expired, and the user
+     * must not have already actioned it. The created todo task is returned.
+     *
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @param id          the notification ID whose action item to convert
+     * @return the created {@link TodoTask} with HTTP 201 Created
      */
     @PostMapping("/{id}/action")
     public ResponseEntity<TodoTask> convertToTodo(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
-        
-        try {
-            TodoTask task = notificationService.convertActionItemToTodo(
-                    id, 
-                    currentUser.getId(), 
-                    currentUser.getId().toString()
-            );
-            return ResponseEntity.status(HttpStatus.CREATED).body(task);
-        } catch (IllegalArgumentException e) {
-            throw new NotificationNotFoundException(id);
-        } catch (IllegalStateException e) {
-            // Map IllegalStateException to appropriate custom exceptions
-            String message = e.getMessage();
-            if (message.contains("action item")) {
-                throw new NoActionItemException();
-            } else if (message.contains("expired")) {
-                throw new NotificationExpiredException();
-            } else if (message.contains("already")) {
-                throw new DuplicateActionException();
-            }
-            throw e;
-        }
+        TodoTask task = notificationService.convertActionItemToTodo(
+                id,
+                currentUser.getId(),
+                currentUser.getId().toString()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
     /**
-     * Soft delete a notification (admin only).
-     * 
-     * @param id the notification ID
-     * @return 204 No Content on success
+     * Permanently deletes a notification. Requires ROLE_ADMIN.
+     * Also removes all associated user read states.
+     *
+     * @param id the notification ID to delete
+     * @return HTTP 204 No Content on success
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteNotification(@PathVariable Long id) {
-        try {
-            notificationService.deleteNotification(id);
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            throw new NotificationNotFoundException(id);
-        }
+        notificationService.deleteNotification(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**
-     * Manually trigger processing of recurring notifications with action items.
-     * Creates todo tasks for all due recurring notifications that haven't been processed today.
-     * Admin only.
-     * 
-     * @return ProcessingResult with counts of processed notifications and created tasks
+     * Manually triggers processing of recurring notifications. Requires ROLE_ADMIN.
+     * Evaluates all recurring notifications with action items, creates todo tasks
+     * for target users whose notifications are due, and resets read states.
+     * This is also invoked automatically by the scheduled recurring action todo processor.
+     *
+     * @return a {@link ProcessingResult} with counts of processed notifications, created todos, and any errors
      */
     @PostMapping("/process-recurring")
     @PreAuthorize("hasRole('ADMIN')")

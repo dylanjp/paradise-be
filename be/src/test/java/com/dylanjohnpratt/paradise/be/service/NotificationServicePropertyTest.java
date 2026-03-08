@@ -785,8 +785,7 @@ class NotificationServiceTodoIntegrationPropertyTest {
         String userIdString = String.valueOf(userId);
         assertThatThrownBy(() -> service.convertActionItemToTodo(notification.getId(), userId, userIdString))
                 .as("Converting expired notification to todo should throw exception")
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("expired");
+                .isInstanceOf(com.dylanjohnpratt.paradise.be.exception.NotificationExpiredException.class);
     }
 
     /**
@@ -822,8 +821,7 @@ class NotificationServiceTodoIntegrationPropertyTest {
         // Second action should fail
         assertThatThrownBy(() -> service.convertActionItemToTodo(notification.getId(), userId, userIdString))
                 .as("Duplicate action should throw exception")
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already created");
+                .isInstanceOf(com.dylanjohnpratt.paradise.be.exception.DuplicateActionException.class);
     }
 
     /**

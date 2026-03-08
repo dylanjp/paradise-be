@@ -15,10 +15,11 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * REST controller handling all task-related HTTP endpoints.
- * Maps the base path /users/{userId}/tasks and delegates business logic to TaskService.
- * Extracts userId from the request path for all endpoints to ensure user-scoped operations.
- * Admins can access any user's tasks; regular users can only access their own.
+ * Controller for task management operations.
+ * Provides endpoints for creating, reading, updating, and deleting both todo tasks
+ * (persistent, category-based, hierarchical) and daily tasks (resettable, completion-tracked).
+ * Also exposes completion history and "perfect days" analytics for daily tasks.
+ * All operations enforce user isolation — a user can only access their own tasks.
  */
 @RestController
 @RequestMapping("/users/{userId}/tasks")
@@ -31,87 +32,69 @@ public class TaskController {
     }
 
     /**
-     * Checks if the authenticated user has the ADMIN role.
-     */
-    private boolean isAdmin(User user) {
-        return user.getAuthorities().stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
-    }
-
-    /**
-     * Retrieves all tasks (todo and Daily) for the specified user.
-     * Returns both task types in a single response with todo tasks grouped by category.
+     * Retrieves all tasks for the specified user.
+     * Returns todo tasks grouped by category and daily tasks as a flat list.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing UserTasksResponse with 200 OK status
+     * @param userId      the user whose tasks to retrieve
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return todo tasks grouped by category and all daily tasks
      */
     @GetMapping
     public ResponseEntity<UserTasksResponse> getAllTasks(
             @PathVariable String userId,
             @AuthenticationPrincipal User currentUser) {
-        UserTasksResponse response = taskService.getAllTasksForUser(
-                userId, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        UserTasksResponse response = taskService.getAllTasksForUser(userId, currentUser.getUsername());
         return ResponseEntity.ok(response);
     }
 
     /**
      * Creates a new todo task for the specified user.
-     * The task is associated with the user from the path and initialized with completed=false.
+     * The task is initialized with completed set to false. Supports optional category,
+     * ordering, and parent-child hierarchy via parentId.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param request the task request containing id, description, category, order, and optional parentId
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing the created TodoTask with 201 Created status
+     * @param userId      the user to create the task for
+     * @param request     the task creation request with ID, description, category, order, and parentId
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the created {@link TodoTask} with HTTP 201 Created
      */
     @PostMapping("/todo")
     public ResponseEntity<TodoTask> createTodoTask(
             @PathVariable String userId,
             @RequestBody TodoTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
-        TodoTask task = taskService.createTodoTask(
-                userId, 
-                request, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        TodoTask task = taskService.createTodoTask(userId, request, currentUser.getUsername());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
     /**
-     * Creates a new Daily task for the specified user.
-     * The task is associated with the user from the path, initialized with completed=false,
-     * and createdAt set to the current timestamp.
+     * Creates a new daily task for the specified user.
+     * Daily tasks reset to incomplete each day and track completion history over time.
+     * The task is initialized with completed set to false and createdAt set to now.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param request the task request containing id, description, and order
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing the created DailyTask with 201 Created status
+     * @param userId      the user to create the task for
+     * @param request     the task creation request with ID, description, and order
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the created {@link DailyTask} with HTTP 201 Created
      */
     @PostMapping("/daily")
     public ResponseEntity<DailyTask> createDailyTask(
             @PathVariable String userId,
             @RequestBody DailyTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
-        DailyTask task = taskService.createDailyTask(
-                userId, 
-                request, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        DailyTask task = taskService.createDailyTask(userId, request, currentUser.getUsername());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
     /**
-     * Updates an existing todo task for the specified user.
-     * Only updates fields that are provided (non-null) in the request.
-     * Returns 404 if the task doesn't exist or belongs to a different user.
+     * Updates an existing todo task.
+     * Supports partial updates — only the fields provided in the request body are modified.
+     * Can update description, completed status, order, and parentId.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param id the unique identifier of the task to update
-     * @param request the task request containing optional description, completed, and order fields
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing the updated TodoTask with 200 OK status
+     * @param userId      the owner of the task
+     * @param id          the task ID to update
+     * @param request     the update request with optional fields
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the updated {@link TodoTask}
      */
     @PutMapping("/todo/{id}")
     public ResponseEntity<TodoTask> updateTodoTask(
@@ -119,25 +102,21 @@ public class TaskController {
             @PathVariable @NonNull String id,
             @RequestBody TodoTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
-        TodoTask task = taskService.updateTodoTask(
-                userId, 
-                id, 
-                request, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        TodoTask task = taskService.updateTodoTask(userId, id, request, currentUser.getUsername());
         return ResponseEntity.ok(task);
     }
 
     /**
-     * Updates an existing Daily task for the specified user.
-     * Only updates fields that are provided (non-null) in the request.
-     * Returns 404 if the task doesn't exist or belongs to a different user.
+     * Updates an existing daily task.
+     * Supports partial updates — only the fields provided in the request body are modified.
+     * When completed is set to true, a completion record is created for today's date.
+     * When completed is set to false, today's completion record is removed.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param id the unique identifier of the task to update
-     * @param request the task request containing optional description, completed, and order fields
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing the updated DailyTask with 200 OK status
+     * @param userId      the owner of the task
+     * @param id          the task ID to update
+     * @param request     the update request with optional fields
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the updated {@link DailyTask}
      */
     @PutMapping("/daily/{id}")
     public ResponseEntity<DailyTask> updateDailyTask(
@@ -145,114 +124,88 @@ public class TaskController {
             @PathVariable @NonNull String id,
             @RequestBody DailyTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
-        DailyTask task = taskService.updateDailyTask(
-                userId, 
-                id, 
-                request, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        DailyTask task = taskService.updateDailyTask(userId, id, request, currentUser.getUsername());
         return ResponseEntity.ok(task);
     }
 
     /**
-     * Deletes a todo task and all its children for the specified user.
-     * Cascade deletes all tasks that have the deleted task's id as their parentId.
-     * Returns 404 if the task doesn't exist or belongs to a different user.
+     * Deletes a todo task. Any child tasks that reference this task as their parent
+     * are un-nested (their parentId is set to null) rather than being cascade-deleted.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param id the unique identifier of the task to delete
-     * @param currentUser the authenticated user
-     * @return ResponseEntity with 204 No Content status
+     * @param userId      the owner of the task
+     * @param id          the task ID to delete
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return HTTP 204 No Content on success
      */
     @DeleteMapping("/todo/{id}")
     public ResponseEntity<Void> deleteTodoTask(
             @PathVariable String userId,
             @PathVariable @NonNull String id,
             @AuthenticationPrincipal User currentUser) {
-        taskService.deleteTodoTask(
-                userId, 
-                id, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        taskService.deleteTodoTask(userId, id, currentUser.getUsername());
         return ResponseEntity.noContent().build();
     }
 
     /**
-     * Deletes a Daily task for the specified user.
-     * Returns 404 if the task doesn't exist or belongs to a different user.
+     * Deletes a daily task and all of its associated completion history records.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param id the unique identifier of the task to delete
-     * @param currentUser the authenticated user
-     * @return ResponseEntity with 204 No Content status
+     * @param userId      the owner of the task
+     * @param id          the task ID to delete
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return HTTP 204 No Content on success
      */
     @DeleteMapping("/daily/{id}")
     public ResponseEntity<Void> deleteDailyTask(
             @PathVariable String userId,
             @PathVariable @NonNull String id,
             @AuthenticationPrincipal User currentUser) {
-        taskService.deleteDailyTask(
-                userId, 
-                id, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        taskService.deleteDailyTask(userId, id, currentUser.getUsername());
         return ResponseEntity.noContent().build();
     }
 
     /**
-     * Retrieves the completion history for a daily task.
-     * Returns all dates when the task was marked as complete, in descending order (most recent first).
-     * Returns 404 if the task doesn't exist or belongs to a different user.
+     * Retrieves the completion history for a daily task as a list of dates
+     * when the task was marked complete, sorted in descending order (most recent first).
      *
-     * @param userId the unique identifier of the user from the path
-     * @param id the unique identifier of the daily task
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing list of completion dates with 200 OK status
+     * @param userId      the owner of the task
+     * @param id          the daily task ID
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return list of completion dates in descending order
      */
     @GetMapping("/daily/{id}/completions")
     public ResponseEntity<List<LocalDate>> getDailyTaskCompletions(
             @PathVariable String userId,
             @PathVariable @NonNull String id,
             @AuthenticationPrincipal User currentUser) {
-        List<LocalDate> completions = taskService.getCompletionHistory(
-                userId, 
-                id, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+        List<LocalDate> completions = taskService.getCompletionHistory(userId, id, currentUser.getUsername());
         return ResponseEntity.ok(completions);
     }
 
     /**
-     * Retrieves all "perfect days" for the specified user in a given year.
-     * A perfect day is a date where the user completed ALL daily tasks that existed on that date.
-     * Returns dates in descending order (most recent first).
+     * Retrieves "perfect days" for the user in a given year — dates on which the user
+     * completed every daily task that existed at that time. Defaults to the current year
+     * if no year parameter is provided. Rejects years before 2000 or more than one year
+     * in the future.
      *
-     * @param userId the unique identifier of the user from the path
-     * @param year the year to retrieve perfect days for (optional, defaults to current year)
-     * @param currentUser the authenticated user
-     * @return ResponseEntity containing list of perfect day dates with 200 OK status
-     *         or 400 Bad Request if year is invalid
+     * @param userId      the owner of the tasks
+     * @param year        optional year to query (defaults to current year)
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return list of perfect day dates in descending order
      */
     @GetMapping("/daily/perfect-days")
     public ResponseEntity<List<LocalDate>> getPerfectDays(
             @PathVariable String userId,
             @RequestParam(required = false) Integer year,
             @AuthenticationPrincipal User currentUser) {
-        
-        // Default to current year if not provided (Requirement 1.5)
+
         int targetYear = (year != null) ? year : LocalDate.now().getYear();
-        
-        // Validate year is within reasonable range (Requirement 1.7)
+
         int currentYear = LocalDate.now().getYear();
         if (targetYear < 2000 || targetYear > currentYear + 1) {
             return ResponseEntity.badRequest().build();
         }
-        
-        List<LocalDate> perfectDays = taskService.getPerfectDays(
-                userId, 
-                targetYear, 
-                currentUser.getUsername(), 
-                isAdmin(currentUser));
+
+        List<LocalDate> perfectDays = taskService.getPerfectDays(userId, targetYear, currentUser.getUsername());
         return ResponseEntity.ok(perfectDays);
     }
 }
