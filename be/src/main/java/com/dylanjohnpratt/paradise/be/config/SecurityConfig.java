@@ -74,6 +74,7 @@ public class SecurityConfig {
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/users/*/drives/**").authenticated()
                 .requestMatchers("/users/*/plex/**").authenticated()
+                .requestMatchers("/docs/**").authenticated()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
