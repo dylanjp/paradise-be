@@ -14,5 +14,6 @@ public record DriveItem(
     String size,
     String color,
     List<String> children,
-    String parentId
+    String parentId,
+    String relativePath
 ) {}

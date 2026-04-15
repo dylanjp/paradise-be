@@ -4,6 +4,7 @@ import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import com.dylanjohnpratt.paradise.be.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -28,6 +29,9 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final InMemoryUserDetailsManager inMemoryUserDetailsManager;
 
+    @Value("${ADMIN_DEFAULT_PASSWORD:}")
+    private String adminDefaultPassword;
+
     public DataInitializer(UserService userService, UserRepository userRepository,
                            PasswordEncoder passwordEncoder, InMemoryUserDetailsManager inMemoryUserDetailsManager) {
         this.userService = userService;
@@ -44,16 +48,22 @@ public class DataInitializer implements CommandLineRunner {
     private void seedUsers() {
         try {
             long userCount = userRepository.count();
-            
+
             if (userCount == 0) {
-                // Database is empty, create the initial admin user
-                userService.createUser("admin", "adminpass", Set.of("ROLE_ADMIN", "ROLE_USER"));
+                if (adminDefaultPassword == null || adminDefaultPassword.isBlank()) {
+                    throw new IllegalStateException(
+                            "ADMIN_DEFAULT_PASSWORD environment variable is required for initial admin user creation. "
+                            + "Set it in your .env file or system environment.");
+                }
+                userService.createUser("admin", adminDefaultPassword, Set.of("ROLE_ADMIN", "ROLE_USER"));
                 logger.info("Created initial admin user in database");
             } else {
                 logger.info("Database already has {} user(s), skipping seed", userCount);
             }
-            
+
             logger.info("Data seeding completed");
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             logger.warn("Database connection failed, falling back to in-memory user: {}", e.getMessage());
             createInMemoryFallbackUser();
@@ -61,12 +71,14 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void createInMemoryFallbackUser() {
+        String password = (adminDefaultPassword != null && !adminDefaultPassword.isBlank())
+                ? adminDefaultPassword : "adminpass";
         UserDetails fallbackAdmin = User.builder()
                 .username("admin")
-                .password(passwordEncoder.encode("adminpass"))
+                .password(passwordEncoder.encode(password))
                 .roles("ADMIN", "USER")
                 .build();
-        
+
         inMemoryUserDetailsManager.createUser(fallbackAdmin);
         logger.info("Created in-memory fallback admin user");
     }

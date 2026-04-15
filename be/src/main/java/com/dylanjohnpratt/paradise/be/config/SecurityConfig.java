@@ -24,6 +24,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Spring Security configuration for the Paradise backend.
+ * Configures JWT-based stateless authentication, CORS for the frontend origins
+ * (localhost dev server and local network hostname), and URL-based authorization rules.
+ * CSRF is disabled (stateless API with JWT tokens). Security headers are enabled
+ * (X-Content-Type-Options, X-Frame-Options, Cache-Control) but HSTS is disabled
+ * since the application runs over HTTP on a local network.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -67,6 +75,12 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
+            .headers(headers -> headers
+                .contentTypeOptions(cto -> {})
+                .frameOptions(fo -> fo.deny())
+                .cacheControl(cc -> {})
+                .httpStrictTransportSecurity(hsts -> hsts.disable())
+            )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**").permitAll()

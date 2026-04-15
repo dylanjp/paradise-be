@@ -4,11 +4,10 @@ import com.dylanjohnpratt.paradise.be.dto.CreateFolderRequest;
 import com.dylanjohnpratt.paradise.be.dto.DriveItem;
 import com.dylanjohnpratt.paradise.be.dto.MoveRequest;
 import com.dylanjohnpratt.paradise.be.dto.UpdateItemRequest;
-import com.dylanjohnpratt.paradise.be.exception.InvalidDriveKeyException;
-import com.dylanjohnpratt.paradise.be.model.DriveKey;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.MyDriveService;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +22,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
+/**
+ * Controller for virtual drive file management operations.
+ * Exposes RESTful endpoints for browsing, creating, uploading, downloading,
+ * renaming, moving, and deleting files and folders within the four drive types
+ * (myDrive, sharedDrive, adminDrive, mediaCache). Each drive type has its own
+ * permission model enforced by {@link MyDriveService}.
+ */
 @RestController
 @RequestMapping("/users/{userId}/drives/{driveKey}")
 public class MyDriveController {
@@ -34,36 +40,33 @@ public class MyDriveController {
     }
 
     /**
-     * Lists all items in a user's drive as a flat map keyed by item ID.
-     * The root folder is always included; its children array defines the top-level contents.
+     * Retrieves the full contents of a drive as a flat map of item IDs to {@link DriveItem} records.
+     * Results are cached in memory with a configurable TTL for frequently accessed drives.
+     * Auto-provisions the myDrive directory for the user if it does not yet exist.
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param currentUser the authenticated user (injected by Spring Security)
-     * @return 200 OK with a {@code Map<String, DriveItem>} body
-     * @throws InvalidDriveKeyException if driveKey is not a valid {@link DriveKey}
-     * @throws DriveAccessDeniedException if currentUser may not access this drive
+     * @param userId      the owner of the drive (or any user for shared/media drives)
+     * @param driveKey    the drive type identifier (myDrive, sharedDrive, adminDrive, mediaCache)
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return a map of item IDs to their {@link DriveItem} metadata
      */
     @GetMapping
     public ResponseEntity<Map<String, DriveItem>> getDriveContents(
             @PathVariable String userId,
             @PathVariable String driveKey,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         Map<String, DriveItem> contents = myDriveService.getDriveContents(userId, driveKey, currentUser);
         return ResponseEntity.ok(contents);
     }
 
     /**
-     * Creates a new folder inside the specified drive.
+     * Creates a new folder inside the specified parent folder within the drive.
+     * Returns 409 Conflict if a folder with the same name already exists in the parent.
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param request  body containing {@code name} and {@code parentId} (both required)
-     * @param currentUser the authenticated user
-     * @return 201 Created with the new {@link DriveItem} representing the folder
-     * @throws DriveItemNotFoundException if parentId does not exist
-     * @throws DriveItemConflictException if a folder with the same name already exists under the parent
+     * @param userId      the owner of the drive
+     * @param driveKey    the drive type identifier
+     * @param request     the folder creation request containing the folder name and parent ID
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the newly created folder as a {@link DriveItem} with HTTP 201 Created
      */
     @PostMapping("/folders")
     public ResponseEntity<DriveItem> createFolder(
@@ -71,23 +74,21 @@ public class MyDriveController {
             @PathVariable String driveKey,
             @Valid @RequestBody CreateFolderRequest request,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         DriveItem folder = myDriveService.createFolder(userId, driveKey, request, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(folder);
     }
 
     /**
-     * Uploads a file into the specified drive folder.
-     * The request must be {@code multipart/form-data} with a {@code file} part and a {@code parentId} parameter.
+     * Uploads a file to the specified parent folder within the drive.
+     * The filename is sanitized to strip path separators and enforce length limits.
+     * Returns 409 Conflict if a file with the same name already exists in the parent.
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param file     the multipart file to upload
-     * @param parentId the ID of the parent folder to upload into
-     * @param currentUser the authenticated user
-     * @return 201 Created with the new {@link DriveItem} representing the uploaded file
-     * @throws DriveItemNotFoundException if parentId does not exist
-     * @throws DriveItemConflictException if a file with the same name already exists under the parent
+     * @param userId      the owner of the drive
+     * @param driveKey    the drive type identifier
+     * @param file        the multipart file to upload
+     * @param parentId    the item ID of the parent folder to upload into
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the uploaded file as a {@link DriveItem} with HTTP 201 Created
      */
     @PostMapping("/files")
     public ResponseEntity<DriveItem> uploadFile(
@@ -96,23 +97,20 @@ public class MyDriveController {
             @RequestParam("file") MultipartFile file,
             @RequestParam String parentId,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         DriveItem item = myDriveService.uploadFile(userId, driveKey, file, parentId, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(item);
     }
 
     /**
-     * Downloads a file from the drive. The response is streamed with the appropriate
-     * Content-Type (auto-detected) and a {@code Content-Disposition: attachment} header.
-     * Folders cannot be downloaded.
+     * Downloads a file from the drive as a streaming response.
+     * Probes the file's MIME type and sets Content-Disposition to attachment with the original filename.
+     * Returns 400 Bad Request if the item is a folder (folders cannot be downloaded).
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param itemId   the ID of the file to download
-     * @param currentUser the authenticated user
-     * @return 200 OK with the file bytes streamed in the response body
-     * @throws DriveItemNotFoundException if itemId does not exist
-     * @throws DownloadFolderException if itemId refers to a folder
+     * @param userId      the owner of the drive
+     * @param driveKey    the drive type identifier
+     * @param itemId      the SHA-256 hash ID of the file to download
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return a streaming response body with the file contents and appropriate headers
      */
     @GetMapping("/items/{itemId}/download")
     public ResponseEntity<StreamingResponseBody> downloadFile(
@@ -120,7 +118,6 @@ public class MyDriveController {
             @PathVariable String driveKey,
             @PathVariable String itemId,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         Path filePath = myDriveService.downloadFile(userId, driveKey, itemId, currentUser);
 
         String contentType;
@@ -134,6 +131,10 @@ public class MyDriveController {
         }
 
         String fileName = filePath.getFileName().toString();
+        String contentDisposition = ContentDisposition.attachment()
+                .filename(fileName)
+                .build()
+                .toString();
 
         StreamingResponseBody body = outputStream -> {
             try (InputStream inputStream = Files.newInputStream(filePath)) {
@@ -143,22 +144,21 @@ public class MyDriveController {
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .header("Content-Disposition", "attachment; filename=\"" + fileName + "\"")
+                .header("Content-Disposition", contentDisposition)
                 .body(body);
     }
 
     /**
-     * Updates a drive item's name and/or color. Both fields are optional;
-     * only provided fields are applied. Renaming also renames the underlying file/folder on disk.
+     * Updates properties of a drive item (file or folder).
+     * Supports renaming (which regenerates item IDs for the item and all descendants)
+     * and changing the display color. Both operations can be performed in a single request.
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param itemId   the ID of the item to update
-     * @param request  body with optional {@code name} and/or {@code color}
-     * @param currentUser the authenticated user
-     * @return 200 OK with the updated {@link DriveItem}
-     * @throws DriveItemNotFoundException if itemId does not exist
-     * @throws DriveItemConflictException if renaming would conflict with an existing sibling
+     * @param userId      the owner of the drive
+     * @param driveKey    the drive type identifier
+     * @param itemId      the SHA-256 hash ID of the item to update
+     * @param request     the update request containing optional new name and/or color
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the updated item as a {@link DriveItem} with its new ID (if renamed)
      */
     @PutMapping("/items/{itemId}")
     public ResponseEntity<DriveItem> updateItem(
@@ -167,20 +167,22 @@ public class MyDriveController {
             @PathVariable String itemId,
             @RequestBody UpdateItemRequest request,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         DriveItem item = myDriveService.updateItem(userId, driveKey, itemId, request, currentUser);
         return ResponseEntity.ok(item);
     }
 
     /**
-     * Moves a file or folder to a different parent folder within the drive.
+     * Moves a file or folder to a different parent folder within the same drive.
+     * Validates that the move does not create a circular folder structure (e.g., moving
+     * a folder into one of its own descendants). Returns 409 Conflict if an item with
+     * the same name already exists in the destination folder.
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param itemId   the ID of the item to move
-     * @param request  body containing the destination {@code parentId}
-     * @param currentUser the authenticated user
-     * @return 200 OK with the updated {@link DriveItem}
+     * @param userId      the owner of the drive
+     * @param driveKey    the drive type identifier
+     * @param itemId      the SHA-256 hash ID of the item to move
+     * @param request     the move request containing the destination parent folder ID
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return the moved item as a {@link DriveItem} at its new location
      */
     @PutMapping("/items/{itemId}/move")
     public ResponseEntity<DriveItem> moveItem(
@@ -189,22 +191,20 @@ public class MyDriveController {
             @PathVariable String itemId,
             @Valid @RequestBody MoveRequest request,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         DriveItem item = myDriveService.moveItem(userId, driveKey, itemId, request, currentUser);
         return ResponseEntity.ok(item);
     }
 
     /**
-     * Deletes a file or folder (and all its contents recursively) from the drive.
-     * The root folder of a drive cannot be deleted.
+     * Deletes a file or folder from the drive.
+     * For folders, recursively deletes all contents. Also removes any associated
+     * metadata (colors) from the database. The drive root cannot be deleted.
      *
-     * @param userId   the owner of the drive
-     * @param driveKey one of: myDrive, sharedDrive, adminDrive, mediaCache
-     * @param itemId   the ID of the item to delete
-     * @param currentUser the authenticated user
-     * @return 204 No Content on success
-     * @throws DriveItemNotFoundException if itemId does not exist
-     * @throws DriveRootDeletionException if attempting to delete the root folder
+     * @param userId      the owner of the drive
+     * @param driveKey    the drive type identifier
+     * @param itemId      the SHA-256 hash ID of the item to delete
+     * @param currentUser the currently authenticated user, injected by Spring Security
+     * @return HTTP 204 No Content on success
      */
     @DeleteMapping("/items/{itemId}")
     public ResponseEntity<Void> deleteItem(
@@ -212,14 +212,7 @@ public class MyDriveController {
             @PathVariable String driveKey,
             @PathVariable String itemId,
             @AuthenticationPrincipal User currentUser) {
-        validateDriveKey(driveKey);
         myDriveService.deleteItem(userId, driveKey, itemId, currentUser);
         return ResponseEntity.noContent().build();
-    }
-
-    private void validateDriveKey(String driveKey) {
-        if (DriveKey.fromString(driveKey) == null) {
-            throw new InvalidDriveKeyException("Invalid drive key: " + driveKey);
-        }
     }
 }

@@ -70,6 +70,12 @@
       "type": "java.lang.Boolean",
       "description": "Enable caching for mediaCache.",
       "defaultValue": true
+    },
+    {
+      "name": "drive.cache.ttl-millis",
+      "type": "java.lang.Long",
+      "description": "Cache TTL in milliseconds for the warm-up scheduler refresh interval.",
+      "defaultValue": 7200000
     }
   ]
 }

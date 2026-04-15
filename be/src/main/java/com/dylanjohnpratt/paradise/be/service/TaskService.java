@@ -18,8 +18,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Service containing all business logic for task management operations.
- * Uses database repositories for persistent storage of tasks per user.
+ * Service for managing todo and daily tasks.
+ * Handles CRUD operations for two task types: todo tasks (persistent, category-based with
+ * parent-child hierarchy) and daily tasks (resettable with completion history tracking).
+ * Enforces user isolation — users can only access their own tasks. Also provides
+ * analytics via completion history and "perfect days" calculation.
  */
 @Service
 public class TaskService {
@@ -35,50 +38,49 @@ public class TaskService {
         this.dailyTaskCompletionRepository = dailyTaskCompletionRepository;
     }
 
-    /**
-     * Retrieves all tasks (both todo and Daily) for a specific user.
-     * Returns empty collections if the user has no tasks.
-     *
-     * @param userId the unique identifier of the user
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return UserTasksResponse containing todo tasks grouped by category and Daily tasks as a list
-     */
-    public UserTasksResponse getAllTasksForUser(String userId, String requestingUserId, boolean isAdmin) {
-        // Users can only access their own tasks (userId in path must match authenticated user)
-        // Note: The comparison uses string equality - frontend must send the same format as the user ID
+    private void checkUserAccess(String userId, String requestingUserId) {
         if (!userId.equals(requestingUserId)) {
             throw new TaskNotFoundException("Access denied");
         }
+    }
+
+    /**
+     * Retrieves all tasks for a user. Returns todo tasks grouped by category
+     * and daily tasks as a flat list.
+     *
+     * @param userId           the user whose tasks to retrieve
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return a {@link UserTasksResponse} containing grouped todo tasks and daily tasks
+     * @throws TaskNotFoundException if the requesting user does not match the target user
+     */
+    public UserTasksResponse getAllTasksForUser(String userId, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
         List<TodoTask> userTodoTasks = todoTaskRepository.findByUserId(userId);
         List<DailyTask> userDailyTasks = dailyTaskRepository.findByUserId(userId);
-        
-        // Group todo tasks by category
+
         Map<String, List<TodoTask>> groupedTodoTasks = userTodoTasks.stream()
                 .collect(Collectors.groupingBy(
                         task -> task.getCategory() != null ? task.getCategory() : "default",
                         Collectors.toList()
                 ));
-        
+
         return new UserTasksResponse(groupedTodoTasks, userDailyTasks);
     }
 
     /**
      * Creates a new todo task for the specified user.
-     * Sets the userId from the path parameter and initializes completed to false.
+     * The task is initialized with completed set to false and uses the provided
+     * ID, description, category, order, and optional parentId.
      *
-     * @param userId the unique identifier of the user
-     * @param request the task request containing id, description, category, order, and optional parentId
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return the created TodoTask
+     * @param userId           the user to create the task for
+     * @param request          the task creation request
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return the persisted {@link TodoTask}
+     * @throws TaskNotFoundException if the requesting user does not match the target user
      */
-    public TodoTask createTodoTask(String userId, TodoTaskRequest request, String requestingUserId, boolean isAdmin) {
-        // Users can only create tasks for themselves
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public TodoTask createTodoTask(String userId, TodoTaskRequest request, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         TodoTask task = new TodoTask(
                 request.getId(),
                 userId,
@@ -93,22 +95,19 @@ public class TaskService {
     }
 
     /**
-     * Creates a new Daily task for the specified user.
-     * Sets the userId from the path parameter, initializes completed to false,
-     * and sets createdAt to the current timestamp.
+     * Creates a new daily task for the specified user.
+     * The task is initialized with completed set to false and createdAt set to now.
+     * Daily tasks reset to incomplete each midnight via the DailyTaskResetScheduler.
      *
-     * @param userId the unique identifier of the user
-     * @param request the task request containing id, description, and order
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return the created DailyTask
+     * @param userId           the user to create the task for
+     * @param request          the task creation request
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return the persisted {@link DailyTask}
+     * @throws TaskNotFoundException if the requesting user does not match the target user
      */
-    public DailyTask createDailyTask(String userId, DailyTaskRequest request, String requestingUserId, boolean isAdmin) {
-        // Users can only create tasks for themselves
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public DailyTask createDailyTask(String userId, DailyTaskRequest request, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         DailyTask task = new DailyTask(
                 request.getId(),
                 userId,
@@ -122,33 +121,27 @@ public class TaskService {
     }
 
     /**
-     * Updates an existing todo task for the specified user.
-     * Only updates fields that are provided (non-null) in the request.
-     * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
+     * Updates an existing todo task with partial field updates.
+     * Only the fields provided in the request (description, completed, order, parentId) are modified.
+     * Validates parent-child relationships to prevent circular references.
      *
-     * @param userId the unique identifier of the user
-     * @param taskId the unique identifier of the task to update
-     * @param request the task request containing optional description, completed, order, and parentId fields
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return the updated TodoTask
-     * @throws TaskNotFoundException if the task is not found for the specified user
-     * @throws IllegalArgumentException if the parentId is invalid
+     * @param userId           the task owner's user ID
+     * @param taskId           the ID of the task to update
+     * @param request          the update request with optional fields
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return the updated {@link TodoTask}
+     * @throws TaskNotFoundException if the task does not exist or belongs to another user
      */
-    public TodoTask updateTodoTask(String userId, @NonNull String taskId, TodoTaskRequest request, String requestingUserId, boolean isAdmin) {
-        // Users can only update their own tasks
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public TodoTask updateTodoTask(String userId, @NonNull String taskId, TodoTaskRequest request, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("todo task not found: " + taskId));
-        
-        // Verify the task belongs to the target user
+
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("todo task not found: " + taskId);
         }
-        
+
         if (request.getDescription() != null) {
             task.setDescription(request.getDescription());
         }
@@ -158,82 +151,62 @@ public class TaskService {
         if (request.getOrder() != null) {
             task.setOrder(request.getOrder());
         }
-        
-        // Handle parentId update - only if field was explicitly set in request
+
         if (request.isParentIdProvided()) {
             String newParentId = request.getParentId();
             if (newParentId != null) {
-                // Validate parent exists and belongs to same user
                 validateParentTask(userId, newParentId, taskId);
             }
             task.setParentId(newParentId);
         }
-        
+
         return todoTaskRepository.save(task);
     }
 
-    /**
-     * Validates that a parent task exists and belongs to the same user.
-     * Also prevents self-referencing (a task cannot be its own parent).
-     *
-     * @param userId the unique identifier of the user
-     * @param parentId the ID of the parent task to validate
-     * @param taskId the ID of the task being updated (to prevent self-referencing)
-     * @throws IllegalArgumentException if the parent task is invalid
-     */
     private void validateParentTask(String userId, String parentId, String taskId) {
-        // Prevent self-referencing
         if (parentId.equals(taskId)) {
             throw new IllegalArgumentException("A task cannot be its own parent");
         }
-        
+
         TodoTask parentTask = todoTaskRepository.findById(parentId)
                 .orElseThrow(() -> new IllegalArgumentException("Parent task not found: " + parentId));
-        
+
         if (!parentTask.getUserId().equals(userId)) {
             throw new IllegalArgumentException("Parent task not found: " + parentId);
         }
     }
 
     /**
-     * Updates an existing Daily task for the specified user.
-     * Only updates fields that are provided (non-null) in the request.
-     * When completed is set to true, creates a completion record for today if not exists.
-     * When completed is set to false, deletes the completion record for today if exists.
-     * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
+     * Updates an existing daily task with partial field updates.
+     * When completed is set to true, a completion record is created for today's date.
+     * When completed is set to false, today's completion record is removed.
+     * Runs in a transaction to ensure atomicity between the task update and completion record changes.
      *
-     * @param userId the unique identifier of the user
-     * @param taskId the unique identifier of the task to update
-     * @param request the task request containing optional description, completed, and order fields
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return the updated DailyTask
-     * @throws TaskNotFoundException if the task is not found for the specified user
+     * @param userId           the task owner's user ID
+     * @param taskId           the ID of the task to update
+     * @param request          the update request with optional fields
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return the updated {@link DailyTask}
+     * @throws TaskNotFoundException if the task does not exist or belongs to another user
      */
     @Transactional
-    public DailyTask updateDailyTask(String userId, @NonNull String taskId, DailyTaskRequest request, String requestingUserId, boolean isAdmin) {
-        // Users can only update their own tasks
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public DailyTask updateDailyTask(String userId, @NonNull String taskId, DailyTaskRequest request, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
-        
-        // Verify the task belongs to the target user
+
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("Daily task not found: " + taskId);
         }
-        
+
         if (request.getDescription() != null) {
             task.setDescription(request.getDescription());
         }
         if (request.getCompleted() != null) {
             if (request.getCompleted()) {
-                // Create completion record for today if not exists
                 createCompletionRecordIfNotExists(taskId, LocalDate.now());
             } else {
-                // Remove completion record for today
                 deleteCompletionRecordForDate(taskId, LocalDate.now());
             }
             task.setCompleted(request.getCompleted());
@@ -241,65 +214,46 @@ public class TaskService {
         if (request.getOrder() != null) {
             task.setOrder(request.getOrder());
         }
-        
+
         return dailyTaskRepository.save(task);
     }
 
-    /**
-     * Creates a completion record for the specified task and date if one doesn't already exist.
-     * This ensures idempotent behavior when marking a task complete multiple times on the same day.
-     *
-     * @param taskId the daily task ID
-     * @param date the completion date
-     */
     private void createCompletionRecordIfNotExists(String taskId, LocalDate date) {
         Optional<DailyTaskCompletion> existing = dailyTaskCompletionRepository
                 .findByDailyTaskIdAndCompletionDate(taskId, date);
-        
+
         if (existing.isEmpty()) {
             DailyTaskCompletion completion = new DailyTaskCompletion(taskId, date);
             dailyTaskCompletionRepository.save(completion);
         }
     }
 
-    /**
-     * Deletes the completion record for the specified task and date if it exists.
-     * Proceeds without error if no record exists.
-     *
-     * @param taskId the daily task ID
-     * @param date the completion date to remove
-     */
     private void deleteCompletionRecordForDate(String taskId, LocalDate date) {
         dailyTaskCompletionRepository.deleteByDailyTaskIdAndCompletionDate(taskId, date);
     }
 
     /**
-     * Deletes a todo task for the specified user.
-     * Unnests all child tasks by setting their parentId to null (orphan prevention).
-     * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
+     * Deletes a todo task. Any child tasks that reference this task as their parent
+     * are un-nested (their parentId is set to null) rather than being cascade-deleted.
+     * Runs in a transaction to ensure atomicity.
      *
-     * @param userId the unique identifier of the user
-     * @param taskId the unique identifier of the task to delete
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @throws TaskNotFoundException if the task is not found for the specified user
+     * @param userId           the task owner's user ID
+     * @param taskId           the ID of the task to delete
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @throws TaskNotFoundException if the task does not exist or belongs to another user
      */
     @Transactional
-    public void deleteTodoTask(String userId, @NonNull String taskId, String requestingUserId, boolean isAdmin) {
-        // Users can only delete their own tasks
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public void deleteTodoTask(String userId, @NonNull String taskId, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         TodoTask task = todoTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("todo task not found: " + taskId));
-        
-        // Verify the task belongs to the target user
+
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("todo task not found: " + taskId);
         }
-        
-        // Unnest children: set parentId to null for all child tasks (orphan prevention)
+
+        // Unnest children: set parentId to null for all child tasks
         List<TodoTask> childTasks = todoTaskRepository.findByUserIdAndParentId(userId, taskId);
         for (TodoTask child : childTasks) {
             child.setParentId(null);
@@ -307,160 +261,133 @@ public class TaskService {
         if (!childTasks.isEmpty()) {
             todoTaskRepository.saveAll(childTasks);
         }
-        
-        // Delete the task
+
         todoTaskRepository.delete(task);
     }
 
     /**
-     * Deletes a Daily task for the specified user.
-     * Also deletes all associated completion records to maintain data integrity.
-     * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
+     * Deletes a daily task and all of its associated completion history records.
+     * Runs in a transaction to ensure atomicity between the task deletion and
+     * completion record cleanup.
      *
-     * @param userId the unique identifier of the user
-     * @param taskId the unique identifier of the task to delete
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @throws TaskNotFoundException if the task is not found for the specified user
+     * @param userId           the task owner's user ID
+     * @param taskId           the ID of the task to delete
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @throws TaskNotFoundException if the task does not exist or belongs to another user
      */
     @Transactional
-    public void deleteDailyTask(String userId, @NonNull String taskId, String requestingUserId, boolean isAdmin) {
-        // Users can only delete their own tasks
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public void deleteDailyTask(String userId, @NonNull String taskId, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
-        
-        // Verify the task belongs to the target user
+
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("Daily task not found: " + taskId);
         }
-        
-        // Delete all completion records for this task first
+
         dailyTaskCompletionRepository.deleteByDailyTaskId(taskId);
-        
+
         dailyTaskRepository.delete(task);
     }
 
     /**
-     * Retrieves the completion history for a daily task.
-     * Returns all dates when the task was marked as complete, in descending order (most recent first).
-     * Throws TaskNotFoundException if the task doesn't exist or belongs to a different user.
+     * Retrieves the completion history for a daily task as a list of dates when the task
+     * was marked complete, sorted in descending order (most recent first).
      *
-     * @param userId the unique identifier of the user
-     * @param taskId the unique identifier of the daily task
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return list of completion dates in descending order, or empty list if no completions exist
-     * @throws TaskNotFoundException if the task is not found for the specified user
+     * @param userId           the task owner's user ID
+     * @param taskId           the ID of the daily task
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return list of completion dates in descending order
+     * @throws TaskNotFoundException if the task does not exist or belongs to another user
      */
-    public List<LocalDate> getCompletionHistory(String userId, @NonNull String taskId, String requestingUserId, boolean isAdmin) {
-        // Users can only view their own tasks
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        
+    public List<LocalDate> getCompletionHistory(String userId, @NonNull String taskId, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new TaskNotFoundException("Daily task not found: " + taskId));
-        
-        // Verify the task belongs to the target user
+
         if (!task.getUserId().equals(userId)) {
             throw new TaskNotFoundException("Daily task not found: " + taskId);
         }
-        
+
         List<DailyTaskCompletion> completions = dailyTaskCompletionRepository
                 .findByDailyTaskIdOrderByCompletionDateDesc(taskId);
-        
+
         return completions.stream()
                 .map(DailyTaskCompletion::getCompletionDate)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Retrieves all "perfect days" for a user in a specific year.
-     * A perfect day is a date where the user completed ALL daily tasks that existed on that date.
-     * Only considers tasks that existed on or before each candidate date (based on createdAt timestamp).
+     * Calculates "perfect days" for the user in a given year — dates on which the user
+     * completed every daily task that existed at that time. A task is only considered
+     * applicable on dates on or after its createdAt date. Returns results sorted in
+     * descending order (most recent first).
      *
-     * @param userId the unique identifier of the user
-     * @param year the year to retrieve perfect days for
-     * @param requestingUserId the ID of the user making the request
-     * @param isAdmin whether the requesting user has admin privileges
-     * @return list of perfect day dates in descending order (most recent first), or empty list if none
+     * @param userId           the task owner's user ID
+     * @param year             the year to query
+     * @param requestingUserId the ID of the user making the request (must match userId)
+     * @return list of perfect day dates in descending order, empty if no daily tasks exist
+     * @throws TaskNotFoundException if the requesting user does not match the target user
      */
-    public List<LocalDate> getPerfectDays(String userId, int year, String requestingUserId, boolean isAdmin) {
-        // Users can only view their own data
-        if (!userId.equals(requestingUserId)) {
-            throw new TaskNotFoundException("Access denied");
-        }
-        // Fetch all daily tasks for the user
+    public List<LocalDate> getPerfectDays(String userId, int year, String requestingUserId) {
+        checkUserAccess(userId, requestingUserId);
+
         List<DailyTask> userDailyTasks = dailyTaskRepository.findByUserId(userId);
-        
-        // Return empty list if no tasks exist (Requirement 1.2)
+
         if (userDailyTasks.isEmpty()) {
             return Collections.emptyList();
         }
-        
-        // Calculate date range for the year
+
         LocalDate startDate = LocalDate.of(year, 1, 1);
         LocalDate endDate;
         LocalDate today = LocalDate.now();
         if (year == today.getYear()) {
-            // For current year, only consider up to today
             endDate = today;
         } else {
             endDate = LocalDate.of(year, 12, 31);
         }
-        
-        // Get all task IDs
+
         List<String> taskIds = userDailyTasks.stream()
                 .map(DailyTask::getId)
                 .collect(Collectors.toList());
-        
-        // Fetch completion records within date range
+
         List<DailyTaskCompletion> completions = dailyTaskCompletionRepository
                 .findByDailyTaskIdInAndCompletionDateBetween(taskIds, startDate, endDate);
-        
-        // Return empty list if no completions exist (Requirement 1.3)
+
         if (completions.isEmpty()) {
             return Collections.emptyList();
         }
-        
-        // Group completions by date
+
         Map<LocalDate, Set<String>> completionsByDate = completions.stream()
                 .collect(Collectors.groupingBy(
                         DailyTaskCompletion::getCompletionDate,
                         Collectors.mapping(DailyTaskCompletion::getDailyTaskId, Collectors.toSet())
                 ));
-        
+
         List<LocalDate> perfectDays = new ArrayList<>();
-        
-        // For each date with completions, check if all applicable tasks were completed
+
         for (Map.Entry<LocalDate, Set<String>> entry : completionsByDate.entrySet()) {
             LocalDate date = entry.getKey();
             Set<String> completedTaskIds = entry.getValue();
-            
-            // Determine which tasks existed on that date (createdAt <= date) (Requirement 2.1, 2.2)
+
             Set<String> applicableTaskIds = userDailyTasks.stream()
                     .filter(task -> !task.getCreatedAt().toLocalDate().isAfter(date))
                     .map(DailyTask::getId)
                     .collect(Collectors.toSet());
-            
-            // If no tasks existed on this date, skip it
+
             if (applicableTaskIds.isEmpty()) {
                 continue;
             }
-            
-            // Check if all applicable tasks have completions for this date
+
             if (completedTaskIds.containsAll(applicableTaskIds)) {
                 perfectDays.add(date);
             }
         }
-        
-        // Sort results descending (most recent first) (Requirement 1.6)
+
         perfectDays.sort(Comparator.reverseOrder());
-        
+
         return perfectDays;
     }
 }

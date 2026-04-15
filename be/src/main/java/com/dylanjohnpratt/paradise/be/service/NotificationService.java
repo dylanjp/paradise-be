@@ -1,5 +1,9 @@
 package com.dylanjohnpratt.paradise.be.service;
 
+import com.dylanjohnpratt.paradise.be.exception.DuplicateActionException;
+import com.dylanjohnpratt.paradise.be.exception.NoActionItemException;
+import com.dylanjohnpratt.paradise.be.exception.NotificationExpiredException;
+import com.dylanjohnpratt.paradise.be.exception.NotificationNotFoundException;
 import com.dylanjohnpratt.paradise.be.model.ActionItem;
 import com.dylanjohnpratt.paradise.be.model.Notification;
 import com.dylanjohnpratt.paradise.be.model.RecurrenceRule;
@@ -278,7 +282,7 @@ public class NotificationService {
     public void markAsRead(Long notificationId, Long userId) {
         // Verify notification exists and is accessible
         getNotificationById(notificationId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found or not accessible"));
+                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
 
         UserNotificationState state = getOrCreateUserNotificationState(notificationId, userId);
         state.markAsRead();
@@ -288,18 +292,18 @@ public class NotificationService {
     /**
      * Marks a notification as unread for a user.
      * Creates UserNotificationState if it doesn't exist.
-     * 
+     *
      * @param notificationId the notification ID
      * @param userId the user ID
-     * @throws IllegalArgumentException if notification not found or not accessible
-     * 
+     * @throws NotificationNotFoundException if notification not found or not accessible
+     *
      * Requirements: 4.3, 4.4
      */
     @Transactional
     public void markAsUnread(Long notificationId, Long userId) {
         // Verify notification exists and is accessible
         getNotificationById(notificationId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found or not accessible"));
+                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
 
         UserNotificationState state = getOrCreateUserNotificationState(notificationId, userId);
         state.markAsUnread();
@@ -341,7 +345,7 @@ public class NotificationService {
     @Transactional
     public void deleteNotification(Long notificationId) {
         Notification notification = notificationRepository.findById(Objects.requireNonNull(notificationId))
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
         
         notification.setDeleted(true);
         notificationRepository.save(notification);
@@ -367,21 +371,21 @@ public class NotificationService {
     public TodoTask convertActionItemToTodo(Long notificationId, Long userId, String userIdString) {
         // Verify notification exists and is accessible
         Notification notification = getNotificationById(notificationId, userId)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found or not accessible"));
+                .orElseThrow(() -> new NotificationNotFoundException(notificationId));
 
         // Validate notification has action item (Requirement 6.2)
         if (!notification.hasActionItem()) {
-            throw new IllegalStateException("This notification does not have an action item");
+            throw new NoActionItemException();
         }
 
         // Check notification not expired (Requirement 6.5)
         if (isExpired(notification)) {
-            throw new IllegalStateException("Cannot action an expired notification");
+            throw new NotificationExpiredException();
         }
 
         // Check user hasn't already actioned (Requirement 6.6)
         if (hasUserActionedNotification(notificationId, userIdString)) {
-            throw new IllegalStateException("You have already created a task from this notification");
+            throw new DuplicateActionException();
         }
 
         // Create TodoTask with notification provenance fields (Requirements 6.3, 6.4)
