@@ -1,5 +1,6 @@
 package com.dylanjohnpratt.paradise.be.service;
 
+import com.dylanjohnpratt.paradise.be.health.seed.HealthMetricSeeder;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.UserRepository;
 import org.springframework.context.annotation.Primary;
@@ -24,10 +25,14 @@ public class UserService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final HealthMetricSeeder healthMetricSeeder;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       HealthMetricSeeder healthMetricSeeder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.healthMetricSeeder = healthMetricSeeder;
     }
 
     /**
@@ -60,7 +65,10 @@ public class UserService implements UserDetailsService {
         
         String hashedPassword = passwordEncoder.encode(password);
         User user = new User(username, hashedPassword, roles);
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        // Seed the canonical health metrics for the new user. Idempotent.
+        healthMetricSeeder.seedFor(saved.getId());
+        return saved;
     }
 
 

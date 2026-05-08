@@ -4,6 +4,7 @@ import com.dylanjohnpratt.paradise.be.config.DrivePathProperties;
 import com.dylanjohnpratt.paradise.be.dto.PlexUploadResponse;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.ItemMetadataRepository;
+import com.dylanjohnpratt.paradise.be.util.ByteSizes;
 import net.jqwik.api.*;
 import net.jqwik.api.lifecycle.AfterProperty;
 import org.springframework.mock.web.MockMultipartFile;
@@ -69,7 +70,7 @@ class PlexUploadRoundTripPropertyTest {
         assertThat(result.fileName()).isEqualTo(fileName);
 
         // (c) The response contains the correct human-readable size
-        String expectedSize = MyDriveService.formatFileSize(content.length);
+        String expectedSize = ByteSizes.format(content.length);
         assertThat(result.size()).isEqualTo(expectedSize);
     }
 
