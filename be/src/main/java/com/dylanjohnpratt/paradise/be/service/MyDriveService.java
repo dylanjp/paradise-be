@@ -17,6 +17,8 @@ import com.dylanjohnpratt.paradise.be.model.DriveKey;
 import com.dylanjohnpratt.paradise.be.model.ItemMetadata;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.repository.ItemMetadataRepository;
+import com.dylanjohnpratt.paradise.be.util.ByteSizes;
+import com.dylanjohnpratt.paradise.be.util.FileNameSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -44,11 +46,6 @@ import java.util.stream.Stream;
 public class MyDriveService {
 
     private static final Logger log = LoggerFactory.getLogger(MyDriveService.class);
-
-    private static final long KB = 1024L;
-    private static final long MB = KB * 1024;
-    private static final long GB = MB * 1024;
-    private static final int MAX_FILENAME_LENGTH = 255;
 
     private final ItemMetadataRepository itemMetadataRepository;
     private final DrivePathProperties drivePathProperties;
@@ -106,42 +103,12 @@ public class MyDriveService {
         }
     }
 
-    static String formatFileSize(long bytes) {
-        if (bytes < KB) {
-            return bytes + " B";
-        } else if (bytes < MB) {
-            return formatSizeUnit(bytes, KB, "KB");
-        } else if (bytes < GB) {
-            return formatSizeUnit(bytes, MB, "MB");
-        } else {
-            return formatSizeUnit(bytes, GB, "GB");
+    private static String sanitizeDriveFileName(String fileName) {
+        try {
+            return FileNameSanitizer.sanitize(fileName);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDriveKeyException(e.getMessage());
         }
-    }
-
-    private static String formatSizeUnit(long bytes, long unit, String suffix) {
-        double value = (double) bytes / unit;
-        if (value == Math.floor(value)) {
-            return (long) value + " " + suffix;
-        }
-        return String.format("%.1f %s", value, suffix);
-    }
-
-    /**
-     * Sanitizes a filename from a multipart upload.
-     * Strips path separators, rejects null/blank, and limits length.
-     */
-    static String sanitizeFileName(String fileName) {
-        if (fileName == null || fileName.isBlank()) {
-            throw new InvalidDriveKeyException("File name is required");
-        }
-        String sanitized = fileName.replace("/", "").replace("\\", "");
-        if (sanitized.isBlank()) {
-            throw new InvalidDriveKeyException("File name is invalid");
-        }
-        if (sanitized.length() > MAX_FILENAME_LENGTH) {
-            sanitized = sanitized.substring(sanitized.length() - MAX_FILENAME_LENGTH);
-        }
-        return sanitized;
     }
 
     private static String extractFileType(String name) {
@@ -216,7 +183,7 @@ public class MyDriveService {
         if (!isDirectory) {
             fileType = extractFileType(name);
             try {
-                size = formatFileSize(Files.size(path));
+                size = ByteSizes.format(Files.size(path));
             } catch (IOException e) {
                 size = "0 B";
             }
@@ -408,7 +375,7 @@ public class MyDriveService {
             throw new DriveItemNotFoundException("Parent folder not found: " + parentId);
         }
 
-        String fileName = sanitizeFileName(file.getOriginalFilename());
+        String fileName = sanitizeDriveFileName(file.getOriginalFilename());
         Path targetPath = parentPath.resolve(fileName);
         if (Files.exists(targetPath)) {
             throw new DriveItemConflictException("An item with name '" + fileName + "' already exists in the parent folder");
@@ -424,7 +391,7 @@ public class MyDriveService {
 
         String size;
         try {
-            size = formatFileSize(Files.size(targetPath));
+            size = ByteSizes.format(Files.size(targetPath));
         } catch (IOException e) {
             size = "0 B";
         }
@@ -750,7 +717,7 @@ public class MyDriveService {
             throw new DriveUnavailableException("Plex upload path is not accessible: " + plexUploadPath);
         }
 
-        String fileName = sanitizeFileName(file.getOriginalFilename());
+        String fileName = sanitizeDriveFileName(file.getOriginalFilename());
 
         Path targetPath = plexDir.resolve(fileName);
         if (Files.exists(targetPath)) {
@@ -765,7 +732,7 @@ public class MyDriveService {
 
         String size;
         try {
-            size = formatFileSize(Files.size(targetPath));
+            size = ByteSizes.format(Files.size(targetPath));
         } catch (IOException e) {
             size = "0 B";
         }
@@ -834,7 +801,7 @@ public class MyDriveService {
                 if (!isDirectory) {
                     fileType = extractFileType(name);
                     try {
-                        size = formatFileSize(Files.size(normalizedPath));
+                        size = ByteSizes.format(Files.size(normalizedPath));
                     } catch (IOException e) {
                         size = "0 B";
                     }
