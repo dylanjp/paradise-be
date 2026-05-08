@@ -52,7 +52,7 @@ class HealthResourceSmokeIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         userRepository.deleteAll();
-        // Create via UserService so HealthMetricSeeder auto-provisions the 5 canonical metrics.
+        // Create via UserService so HealthMetricSeeder auto-provisions the 6 canonical metrics.
         userService.createUser("owner", "ownerpass", Set.of("ROLE_USER"));
         ownerToken = obtainToken("owner", "ownerpass");
     }
@@ -108,12 +108,12 @@ class HealthResourceSmokeIntegrationTest {
     }
 
     @Test
-    @DisplayName("Metrics: 5 seeded metrics auto-provisioned, seeded metric cannot be deleted")
+    @DisplayName("Metrics: 6 seeded metrics auto-provisioned, seeded metric cannot be deleted")
     void metricsSeededOnUserCreate() throws Exception {
         mockMvc.perform(get("/users/owner/health/metrics")
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$.length()").value(6))
                 .andExpect(jsonPath("$[?(@.slug=='bp')].seeded").value(true));
 
         // Grab the bp metric id and try to delete it → 403 HEALTH_SEEDED_METRIC_LOCKED
