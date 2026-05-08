@@ -246,10 +246,11 @@ class HealthJournalServicePropertyTest {
      * so {@link HealthJournalService}'s mood-sync path is a no-op. These tests
      * predate the mood field and don't assert on graph state.
      */
+    @SuppressWarnings("null")
     private static class NoopMetricRepo implements HealthMetricRepository {
-        @Override public List<HealthMetric> findByUserIdOrderByCreatedAtAsc(Long userId) { return List.of(); }
-        @Override public Optional<HealthMetric> findByIdAndUserId(String id, Long userId) { return Optional.empty(); }
-        @Override public Optional<HealthMetric> findByUserIdAndSlug(Long userId, String slug) { return Optional.empty(); }
+        @Override @NonNull public List<HealthMetric> findByUserIdOrderByCreatedAtAsc(Long userId) { return List.of(); }
+        @Override @NonNull public Optional<HealthMetric> findByIdAndUserId(String id, Long userId) { return Optional.empty(); }
+        @Override @NonNull public Optional<HealthMetric> findByUserIdAndSlug(Long userId, String slug) { return Optional.empty(); }
         @Override public boolean existsByUserIdAndSlug(Long userId, String slug) { return false; }
 
         // -- Unused JpaRepository surface --
