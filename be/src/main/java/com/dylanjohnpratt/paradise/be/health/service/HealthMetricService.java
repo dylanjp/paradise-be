@@ -10,6 +10,7 @@ import com.dylanjohnpratt.paradise.be.exception.HealthSeededMetricLockedExceptio
 import com.dylanjohnpratt.paradise.be.exception.HealthValidationException;
 import com.dylanjohnpratt.paradise.be.health.model.Dataset;
 import com.dylanjohnpratt.paradise.be.health.model.HealthMetric;
+import com.dylanjohnpratt.paradise.be.health.model.HealthMetricPointSorter;
 import com.dylanjohnpratt.paradise.be.health.model.HealthMetricType;
 import com.dylanjohnpratt.paradise.be.health.repository.HealthMetricRepository;
 import com.dylanjohnpratt.paradise.be.model.User;
@@ -122,8 +123,48 @@ public class HealthMetricService {
             metric.setLabels(labels);
         }
 
+        sortPointsByLabel(metric);
+
         HealthMetric saved = metricRepository.save(metric);
         return HealthMetricResponse.from(saved);
+    }
+
+    /**
+     * Reorders the metric's parallel arrays ascending by label so the chart's
+     * x-axis reflects the data point's date, not the order points were entered.
+     * No-op when labels are absent, the parallel arrays disagree in length, or
+     * the labels are already sorted.
+     */
+    private static void sortPointsByLabel(HealthMetric metric) {
+        List<String> labels = metric.getLabels();
+        if (labels == null || labels.size() < 2) {
+            return;
+        }
+        int n = labels.size();
+        if (metric.getType().isSingleSeries()) {
+            List<BigDecimal> data = metric.getData();
+            if (data == null || data.size() != n) return;
+        } else {
+            List<Dataset> datasets = metric.getDatasets();
+            if (datasets == null) return;
+            for (Dataset ds : datasets) {
+                if (ds.data() == null || ds.data().size() != n) return;
+            }
+        }
+
+        int[] order = HealthMetricPointSorter.sortIndicesByLabelAscending(labels);
+        if (order == null) return;
+
+        metric.setLabels(HealthMetricPointSorter.applyIndices(labels, order));
+        if (metric.getType().isSingleSeries()) {
+            metric.setData(HealthMetricPointSorter.applyIndices(metric.getData(), order));
+        } else {
+            List<Dataset> reordered = new ArrayList<>(metric.getDatasets().size());
+            for (Dataset ds : metric.getDatasets()) {
+                reordered.add(new Dataset(ds.label(), HealthMetricPointSorter.applyIndices(ds.data(), order)));
+            }
+            metric.setDatasets(reordered);
+        }
     }
 
     private void appendSingleSeriesPoint(HealthMetric metric, HealthMetricPointRequest request) {
