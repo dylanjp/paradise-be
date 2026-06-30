@@ -4,6 +4,7 @@ import com.dylanjohnpratt.paradise.be.dto.HealthDatasetDto;
 import com.dylanjohnpratt.paradise.be.dto.HealthMetricPointRequest;
 import com.dylanjohnpratt.paradise.be.dto.HealthMetricRequest;
 import com.dylanjohnpratt.paradise.be.dto.HealthMetricResponse;
+import com.dylanjohnpratt.paradise.be.dto.HealthMetricUpdateRequest;
 import com.dylanjohnpratt.paradise.be.exception.HealthAccessDeniedException;
 import com.dylanjohnpratt.paradise.be.exception.HealthNotFoundException;
 import com.dylanjohnpratt.paradise.be.exception.HealthSeededMetricLockedException;
@@ -130,6 +131,116 @@ public class HealthMetricService {
     }
 
     /**
+     * Updates an existing metric's editable settings (name, unit, colors).
+     * Type and stored series data are intentionally immutable here. Allowed on
+     * seeded metrics — only whole-metric deletion is locked for those.
+     */
+    @Transactional
+    public HealthMetricResponse updateMetric(
+            String userId, String metricId, HealthMetricUpdateRequest request, User currentUser) {
+        checkAccess(userId, currentUser);
+        if (request == null || request.name() == null || request.name().isBlank()) {
+            throw new HealthValidationException("name is required");
+        }
+        HealthMetric metric = metricRepository
+                .findByIdAndUserId(metricId, currentUser.getId())
+                .orElseThrow(() -> new HealthNotFoundException("Metric not found: " + metricId));
+
+        metric.setName(request.name());
+        metric.setUnit(request.unit());
+        if (request.colors() != null) {
+            metric.setColors(request.colors());
+        }
+
+        HealthMetric saved = metricRepository.save(metric);
+        return HealthMetricResponse.from(saved);
+    }
+
+    /**
+     * Replaces the value(s) — and optionally the label — of the point at {@code index}
+     * (0-based, in label-sorted order). Re-sorts afterward in case the label changed.
+     */
+    @Transactional
+    public HealthMetricResponse updatePoint(
+            String userId, String metricId, int index, HealthMetricPointRequest request, User currentUser) {
+        checkAccess(userId, currentUser);
+        if (request == null) {
+            throw new HealthValidationException("body is required");
+        }
+        HealthMetric metric = metricRepository
+                .findByIdAndUserId(metricId, currentUser.getId())
+                .orElseThrow(() -> new HealthNotFoundException("Metric not found: " + metricId));
+
+        if (metric.getType().isSingleSeries()) {
+            updateSingleSeriesPoint(metric, index, request);
+        } else {
+            updateMultiSeriesPoint(metric, index, request);
+        }
+
+        // Optional updated x-axis tick label for this point.
+        if (request.label() != null) {
+            List<String> labels = metric.getLabels() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(metric.getLabels());
+            requireInBounds(index, labels.size());
+            labels.set(index, request.label());
+            metric.setLabels(labels);
+        }
+
+        sortPointsByLabel(metric);
+
+        HealthMetric saved = metricRepository.save(metric);
+        return HealthMetricResponse.from(saved);
+    }
+
+    /**
+     * Removes the point at {@code index} (0-based, in label-sorted order) from the
+     * label list and every parallel value series. Order is preserved, so no re-sort.
+     */
+    @Transactional
+    public HealthMetricResponse deletePoint(
+            String userId, String metricId, int index, User currentUser) {
+        checkAccess(userId, currentUser);
+        HealthMetric metric = metricRepository
+                .findByIdAndUserId(metricId, currentUser.getId())
+                .orElseThrow(() -> new HealthNotFoundException("Metric not found: " + metricId));
+
+        if (metric.getType().isSingleSeries()) {
+            List<BigDecimal> data = metric.getData() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(metric.getData());
+            requireInBounds(index, data.size());
+            data.remove(index);
+            metric.setData(data);
+        } else {
+            List<Dataset> existing = metric.getDatasets() == null ? List.of() : metric.getDatasets();
+            if (existing.isEmpty()) {
+                throw new HealthValidationException("Metric has no datasets configured");
+            }
+            List<Dataset> updated = new ArrayList<>(existing.size());
+            for (Dataset ds : existing) {
+                List<BigDecimal> newData = ds.data() == null
+                        ? new ArrayList<>()
+                        : new ArrayList<>(ds.data());
+                requireInBounds(index, newData.size());
+                newData.remove(index);
+                updated.add(new Dataset(ds.label(), newData));
+            }
+            metric.setDatasets(updated);
+        }
+
+        // Keep the shared x-axis labels aligned with the trimmed series.
+        if (metric.getLabels() != null && index >= 0 && index < metric.getLabels().size()) {
+            List<String> labels = new ArrayList<>(metric.getLabels());
+            labels.remove(index);
+            metric.setLabels(labels);
+        }
+
+        HealthMetric saved = metricRepository.save(metric);
+        return HealthMetricResponse.from(saved);
+    }
+
+    /**
      * Reorders the metric's parallel arrays ascending by label so the chart's
      * x-axis reflects the data point's date, not the order points were entered.
      * No-op when labels are absent, the parallel arrays disagree in length, or
@@ -184,6 +295,61 @@ public class HealthMetricService {
     }
 
     private void appendMultiSeriesPoint(HealthMetric metric, HealthMetricPointRequest request) {
+        List<Dataset> existing = metric.getDatasets();
+        java.util.Map<String, BigDecimal> incoming = mapAndValidateMultiSeriesValues(existing, request);
+
+        // Append one value per dataset, preserving original dataset order.
+        List<Dataset> updated = new ArrayList<>(existing.size());
+        for (Dataset ds : existing) {
+            List<BigDecimal> newData = ds.data() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(ds.data());
+            newData.add(incoming.get(ds.label()));
+            updated.add(new Dataset(ds.label(), newData));
+        }
+        metric.setDatasets(updated);
+    }
+
+    private void updateSingleSeriesPoint(HealthMetric metric, int index, HealthMetricPointRequest request) {
+        if (request.value() == null) {
+            throw new HealthValidationException(
+                    "value is required for single-series (line, bar) metrics");
+        }
+        if (request.values() != null && !request.values().isEmpty()) {
+            throw new HealthValidationException(
+                    "Single-series metrics use 'value', not 'values'");
+        }
+        List<BigDecimal> data = metric.getData() == null
+                ? new ArrayList<>()
+                : new ArrayList<>(metric.getData());
+        requireInBounds(index, data.size());
+        data.set(index, request.value());
+        metric.setData(data);
+    }
+
+    private void updateMultiSeriesPoint(HealthMetric metric, int index, HealthMetricPointRequest request) {
+        List<Dataset> existing = metric.getDatasets();
+        java.util.Map<String, BigDecimal> incoming = mapAndValidateMultiSeriesValues(existing, request);
+
+        List<Dataset> updated = new ArrayList<>(existing.size());
+        for (Dataset ds : existing) {
+            List<BigDecimal> newData = ds.data() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(ds.data());
+            requireInBounds(index, newData.size());
+            newData.set(index, incoming.get(ds.label()));
+            updated.add(new Dataset(ds.label(), newData));
+        }
+        metric.setDatasets(updated);
+    }
+
+    /**
+     * Validates a multi-series point payload against a metric's datasets and returns
+     * an insertion-ordered label → value map. Shared by append and update so both
+     * enforce the same single-vs-multi and exact-dataset-label-match rules.
+     */
+    private static java.util.Map<String, BigDecimal> mapAndValidateMultiSeriesValues(
+            List<Dataset> existing, HealthMetricPointRequest request) {
         if (request.value() != null) {
             throw new HealthValidationException(
                     "Multi-series metrics use 'values', not 'value'");
@@ -192,13 +358,9 @@ public class HealthMetricService {
             throw new HealthValidationException(
                     "values is required for multi-series (dual-line, multi-line) metrics");
         }
-
-        List<Dataset> existing = metric.getDatasets() == null
-                ? new ArrayList<>()
-                : metric.getDatasets();
-        if (existing.isEmpty()) {
+        if (existing == null || existing.isEmpty()) {
             throw new HealthValidationException(
-                    "Metric has no datasets configured; cannot append a multi-series point");
+                    "Metric has no datasets configured; cannot set a multi-series point");
         }
 
         // Build label → value map from incoming, rejecting duplicates.
@@ -224,17 +386,13 @@ public class HealthMetricService {
                     "values labels must exactly match the metric's dataset labels "
                             + existingLabels + " (received " + incoming.keySet() + ")");
         }
+        return incoming;
+    }
 
-        // Append one value per dataset, preserving original dataset order.
-        List<Dataset> updated = new ArrayList<>(existing.size());
-        for (Dataset ds : existing) {
-            List<BigDecimal> newData = ds.data() == null
-                    ? new ArrayList<>()
-                    : new ArrayList<>(ds.data());
-            newData.add(incoming.get(ds.label()));
-            updated.add(new Dataset(ds.label(), newData));
+    private static void requireInBounds(int index, int size) {
+        if (index < 0 || index >= size) {
+            throw new HealthValidationException("point index out of range: " + index);
         }
-        metric.setDatasets(updated);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.dylanjohnpratt.paradise.be.health.controller;
 import com.dylanjohnpratt.paradise.be.dto.HealthMetricPointRequest;
 import com.dylanjohnpratt.paradise.be.dto.HealthMetricRequest;
 import com.dylanjohnpratt.paradise.be.dto.HealthMetricResponse;
+import com.dylanjohnpratt.paradise.be.dto.HealthMetricUpdateRequest;
 import com.dylanjohnpratt.paradise.be.health.service.HealthMetricService;
 import com.dylanjohnpratt.paradise.be.model.User;
 import jakarta.validation.Valid;
@@ -42,6 +43,16 @@ public class HealthMetricController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PutMapping("/{metricId}")
+    public ResponseEntity<HealthMetricResponse> update(
+            @PathVariable String userId,
+            @PathVariable String metricId,
+            @Valid @RequestBody HealthMetricUpdateRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        HealthMetricResponse response = metricService.updateMetric(userId, metricId, request, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{metricId}")
     public ResponseEntity<Void> delete(
             @PathVariable String userId,
@@ -58,6 +69,27 @@ public class HealthMetricController {
             @Valid @RequestBody HealthMetricPointRequest request,
             @AuthenticationPrincipal User currentUser) {
         HealthMetricResponse response = metricService.appendPoint(userId, metricId, request, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{metricId}/points/{index}")
+    public ResponseEntity<HealthMetricResponse> updatePoint(
+            @PathVariable String userId,
+            @PathVariable String metricId,
+            @PathVariable int index,
+            @Valid @RequestBody HealthMetricPointRequest request,
+            @AuthenticationPrincipal User currentUser) {
+        HealthMetricResponse response = metricService.updatePoint(userId, metricId, index, request, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{metricId}/points/{index}")
+    public ResponseEntity<HealthMetricResponse> deletePoint(
+            @PathVariable String userId,
+            @PathVariable String metricId,
+            @PathVariable int index,
+            @AuthenticationPrincipal User currentUser) {
+        HealthMetricResponse response = metricService.deletePoint(userId, metricId, index, currentUser);
         return ResponseEntity.ok(response);
     }
 }
