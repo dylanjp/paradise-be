@@ -5,6 +5,8 @@ import com.dylanjohnpratt.paradise.be.dto.HealthJournalEntryResponse;
 import com.dylanjohnpratt.paradise.be.health.service.HealthJournalService;
 import com.dylanjohnpratt.paradise.be.model.User;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +21,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/users/{userId}/health/journal")
 public class HealthJournalController {
+
+    private static final Logger log = LoggerFactory.getLogger(HealthJournalController.class);
 
     private final HealthJournalService journalService;
 
@@ -38,7 +42,9 @@ public class HealthJournalController {
             @PathVariable String userId,
             @Valid @RequestBody HealthJournalEntryRequest request,
             @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(journalService.upsert(userId, request, currentUser));
+        HealthJournalEntryResponse response = journalService.upsert(userId, request, currentUser);
+        log.info("AUDIT health.journal.upsert user={} targetUser={}", currentUser.getUsername(), userId);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping
@@ -46,6 +52,7 @@ public class HealthJournalController {
             @PathVariable String userId,
             @AuthenticationPrincipal User currentUser) {
         journalService.deleteAll(userId, currentUser);
+        log.info("AUDIT health.journal.deleteAll user={} targetUser={}", currentUser.getUsername(), userId);
         return ResponseEntity.noContent().build();
     }
 
@@ -55,6 +62,8 @@ public class HealthJournalController {
             @PathVariable String entryId,
             @AuthenticationPrincipal User currentUser) {
         journalService.delete(userId, entryId, currentUser);
+        log.info("AUDIT health.journal.delete user={} targetUser={} entryId={}",
+                currentUser.getUsername(), userId, entryId);
         return ResponseEntity.noContent().build();
     }
 
@@ -62,6 +71,7 @@ public class HealthJournalController {
     public ResponseEntity<StreamingResponseBody> exportCsv(
             @PathVariable String userId,
             @AuthenticationPrincipal User currentUser) {
+        log.info("AUDIT health.journal.export user={} targetUser={}", currentUser.getUsername(), userId);
         StreamingResponseBody body = out -> journalService.exportCsv(userId, out, currentUser);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))

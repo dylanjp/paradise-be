@@ -3,6 +3,8 @@ package com.dylanjohnpratt.paradise.be.controller;
 import com.dylanjohnpratt.paradise.be.dto.PlexUploadResponse;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.MyDriveService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/users/{userId}/plex")
 public class PlexUploadController {
+
+    private static final Logger log = LoggerFactory.getLogger(PlexUploadController.class);
 
     private final MyDriveService myDriveService;
 
@@ -39,6 +43,8 @@ public class PlexUploadController {
             @RequestParam("file") MultipartFile file,
             @AuthenticationPrincipal User currentUser) {
         PlexUploadResponse response = myDriveService.uploadToPlex(userId, file, currentUser);
+        log.info("AUDIT plex.upload user={} targetUser={} name={} size={}",
+                currentUser.getUsername(), userId, file.getOriginalFilename(), file.getSize());
         return ResponseEntity.ok(response);
     }
 }

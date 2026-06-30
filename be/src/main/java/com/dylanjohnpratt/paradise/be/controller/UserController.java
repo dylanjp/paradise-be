@@ -3,6 +3,8 @@ package com.dylanjohnpratt.paradise.be.controller;
 import com.dylanjohnpratt.paradise.be.dto.ChangePasswordRequest;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,6 +19,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/users")
 public class UserController {
+
+    private static final Logger log = LoggerFactory.getLogger(UserController.class);
 
     private final UserService userService;
 
@@ -42,6 +46,7 @@ public class UserController {
                     request.currentPassword(),
                     request.newPassword()
             );
+            log.info("AUDIT user.changePassword user={}", currentUser.getUsername());
             return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

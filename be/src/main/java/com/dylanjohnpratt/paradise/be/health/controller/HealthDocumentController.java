@@ -6,6 +6,8 @@ import com.dylanjohnpratt.paradise.be.health.model.HealthDocumentCategory;
 import com.dylanjohnpratt.paradise.be.health.service.HealthDocumentDownload;
 import com.dylanjohnpratt.paradise.be.health.service.HealthDocumentService;
 import com.dylanjohnpratt.paradise.be.model.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,6 +31,8 @@ import java.util.Objects;
 @RestController
 @RequestMapping("/users/{userId}/health/documents")
 public class HealthDocumentController {
+
+    private static final Logger log = LoggerFactory.getLogger(HealthDocumentController.class);
 
     private final HealthDocumentService documentService;
 
@@ -59,6 +63,8 @@ public class HealthDocumentController {
                     "Unknown category: " + categoryValue);
         }
         HealthDocumentResponse response = documentService.upload(userId, file, category, currentUser);
+        log.info("AUDIT health.document.upload user={} targetUser={} category={} name={} size={}",
+                currentUser.getUsername(), userId, category, file.getOriginalFilename(), file.getSize());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -68,6 +74,8 @@ public class HealthDocumentController {
             @PathVariable String documentId,
             @AuthenticationPrincipal User currentUser) {
         HealthDocumentDownload download = documentService.resolveDownload(userId, documentId, currentUser);
+        log.info("AUDIT health.document.download user={} targetUser={} documentId={}",
+                currentUser.getUsername(), userId, documentId);
 
         HealthDocument document = download.document();
         String contentType;
@@ -104,6 +112,8 @@ public class HealthDocumentController {
             @PathVariable String documentId,
             @AuthenticationPrincipal User currentUser) {
         documentService.delete(userId, documentId, currentUser);
+        log.info("AUDIT health.document.delete user={} targetUser={} documentId={}",
+                currentUser.getUsername(), userId, documentId);
         return ResponseEntity.noContent().build();
     }
 
@@ -111,6 +121,7 @@ public class HealthDocumentController {
     public ResponseEntity<StreamingResponseBody> exportCsv(
             @PathVariable String userId,
             @AuthenticationPrincipal User currentUser) {
+        log.info("AUDIT health.document.export user={} targetUser={}", currentUser.getUsername(), userId);
         StreamingResponseBody body = out -> documentService.exportCsv(userId, out, currentUser);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))

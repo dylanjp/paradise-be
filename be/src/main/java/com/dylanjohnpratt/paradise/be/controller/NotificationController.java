@@ -11,6 +11,8 @@ import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.NotificationService;
 import com.dylanjohnpratt.paradise.be.service.ProcessingResult;
 import com.dylanjohnpratt.paradise.be.service.RecurringActionTodoService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +32,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationController {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationController.class);
 
     private final NotificationService notificationService;
     private final RecurringActionTodoService recurringActionTodoService;
@@ -96,7 +100,8 @@ public class NotificationController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<NotificationDTO> createNotification(
-            @RequestBody CreateNotificationRequest request) {
+            @RequestBody CreateNotificationRequest request,
+            @AuthenticationPrincipal User currentUser) {
 
         RecurrenceRule recurrenceRule = request.recurrenceRule() != null
                 ? request.recurrenceRule().toEntity()
@@ -116,6 +121,8 @@ public class NotificationController {
                 actionItem
         );
 
+        log.info("AUDIT notification.create actor={} notificationId={} subject={} global={} targets={}",
+                currentUser.getUsername(), notification.getId(), request.subject(), request.isGlobal(), request.targetUserIds());
         NotificationDTO dto = NotificationDTO.fromEntity(notification, false);
         return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
@@ -133,6 +140,7 @@ public class NotificationController {
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
         notificationService.markAsRead(id, currentUser.getId());
+        log.info("AUDIT notification.markRead user={} notificationId={}", currentUser.getUsername(), id);
         return ResponseEntity.noContent().build();
     }
 
@@ -149,6 +157,7 @@ public class NotificationController {
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
         notificationService.markAsUnread(id, currentUser.getId());
+        log.info("AUDIT notification.markUnread user={} notificationId={}", currentUser.getUsername(), id);
         return ResponseEntity.noContent().build();
     }
 
@@ -170,6 +179,7 @@ public class NotificationController {
                 currentUser.getId(),
                 currentUser.getId().toString()
         );
+        log.info("AUDIT notification.convertToTodo user={} notificationId={}", currentUser.getUsername(), id);
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -182,8 +192,10 @@ public class NotificationController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteNotification(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteNotification(@PathVariable Long id,
+                                                   @AuthenticationPrincipal User currentUser) {
         notificationService.deleteNotification(id);
+        log.info("AUDIT notification.delete actor={} notificationId={}", currentUser.getUsername(), id);
         return ResponseEntity.noContent().build();
     }
 
@@ -197,8 +209,10 @@ public class NotificationController {
      */
     @PostMapping("/process-recurring")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ProcessingResult> processRecurringNotifications() {
+    public ResponseEntity<ProcessingResult> processRecurringNotifications(
+            @AuthenticationPrincipal User currentUser) {
         ProcessingResult result = recurringActionTodoService.processRecurringNotifications();
+        log.info("AUDIT notification.processRecurring actor={}", currentUser.getUsername());
         return ResponseEntity.ok(result);
     }
 }
