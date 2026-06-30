@@ -7,6 +7,8 @@ import com.dylanjohnpratt.paradise.be.dto.UpdateItemRequest;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.MyDriveService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -32,6 +34,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/users/{userId}/drives/{driveKey}")
 public class MyDriveController {
+
+    private static final Logger log = LoggerFactory.getLogger(MyDriveController.class);
 
     private final MyDriveService myDriveService;
 
@@ -75,6 +79,8 @@ public class MyDriveController {
             @Valid @RequestBody CreateFolderRequest request,
             @AuthenticationPrincipal User currentUser) {
         DriveItem folder = myDriveService.createFolder(userId, driveKey, request, currentUser);
+        log.info("AUDIT drive.createFolder user={} drive={}/{} name={} parent={}",
+                currentUser.getUsername(), userId, driveKey, request.name(), request.parentId());
         return ResponseEntity.status(HttpStatus.CREATED).body(folder);
     }
 
@@ -98,6 +104,8 @@ public class MyDriveController {
             @RequestParam String parentId,
             @AuthenticationPrincipal User currentUser) {
         DriveItem item = myDriveService.uploadFile(userId, driveKey, file, parentId, currentUser);
+        log.info("AUDIT drive.uploadFile user={} drive={}/{} parent={} name={} size={}",
+                currentUser.getUsername(), userId, driveKey, parentId, file.getOriginalFilename(), file.getSize());
         return ResponseEntity.status(HttpStatus.CREATED).body(item);
     }
 
@@ -119,6 +127,8 @@ public class MyDriveController {
             @PathVariable String itemId,
             @AuthenticationPrincipal User currentUser) {
         Path filePath = myDriveService.downloadFile(userId, driveKey, itemId, currentUser);
+        log.info("AUDIT drive.downloadFile user={} drive={}/{} itemId={}",
+                currentUser.getUsername(), userId, driveKey, itemId);
 
         String contentType;
         try {
@@ -168,6 +178,8 @@ public class MyDriveController {
             @RequestBody UpdateItemRequest request,
             @AuthenticationPrincipal User currentUser) {
         DriveItem item = myDriveService.updateItem(userId, driveKey, itemId, request, currentUser);
+        log.info("AUDIT drive.updateItem user={} drive={}/{} itemId={}",
+                currentUser.getUsername(), userId, driveKey, itemId);
         return ResponseEntity.ok(item);
     }
 
@@ -192,6 +204,8 @@ public class MyDriveController {
             @Valid @RequestBody MoveRequest request,
             @AuthenticationPrincipal User currentUser) {
         DriveItem item = myDriveService.moveItem(userId, driveKey, itemId, request, currentUser);
+        log.info("AUDIT drive.moveItem user={} drive={}/{} itemId={} newParent={}",
+                currentUser.getUsername(), userId, driveKey, itemId, request.parentId());
         return ResponseEntity.ok(item);
     }
 
@@ -213,6 +227,8 @@ public class MyDriveController {
             @PathVariable String itemId,
             @AuthenticationPrincipal User currentUser) {
         myDriveService.deleteItem(userId, driveKey, itemId, currentUser);
+        log.info("AUDIT drive.deleteItem user={} drive={}/{} itemId={}",
+                currentUser.getUsername(), userId, driveKey, itemId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -5,10 +5,13 @@ import com.dylanjohnpratt.paradise.be.dto.ResetPasswordRequest;
 import com.dylanjohnpratt.paradise.be.dto.UpdateRolesRequest;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,6 +25,8 @@ import java.util.Map;
 @RequestMapping("/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
 public class UserAdminController {
+
+    private static final Logger log = LoggerFactory.getLogger(UserAdminController.class);
 
     private final UserService userService;
 
@@ -54,9 +59,12 @@ public class UserAdminController {
      * @return the created user
      */
     @PostMapping
-    public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request) {
+    public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request,
+                                        @AuthenticationPrincipal User currentUser) {
         try {
             User user = userService.createUser(request.username(), request.password(), request.roles());
+            log.info("AUDIT admin.createUser actor={} newUsername={} roles={}",
+                    currentUser.getUsername(), request.username(), request.roles());
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "id", user.getId(),
                     "username", user.getUsername(),
@@ -77,9 +85,12 @@ public class UserAdminController {
      * @return the updated user
      */
     @PutMapping("/{id}/roles")
-    public ResponseEntity<?> updateRoles(@PathVariable @NonNull Long id, @RequestBody UpdateRolesRequest request) {
+    public ResponseEntity<?> updateRoles(@PathVariable @NonNull Long id, @RequestBody UpdateRolesRequest request,
+                                         @AuthenticationPrincipal User currentUser) {
         try {
             User user = userService.updateRoles(id, request.roles());
+            log.info("AUDIT admin.updateRoles actor={} targetUserId={} roles={}",
+                    currentUser.getUsername(), id, request.roles());
             return ResponseEntity.ok(Map.of(
                     "id", user.getId(),
                     "username", user.getUsername(),
@@ -100,9 +111,11 @@ public class UserAdminController {
      * @return success message
      */
     @PutMapping("/{id}/password")
-    public ResponseEntity<?> resetPassword(@PathVariable @NonNull Long id, @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<?> resetPassword(@PathVariable @NonNull Long id, @RequestBody ResetPasswordRequest request,
+                                           @AuthenticationPrincipal User currentUser) {
         try {
             userService.resetPassword(id, request.newPassword());
+            log.info("AUDIT admin.resetPassword actor={} targetUserId={}", currentUser.getUsername(), id);
             return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -117,9 +130,11 @@ public class UserAdminController {
      * @return success message
      */
     @PutMapping("/{id}/disable")
-    public ResponseEntity<?> disableUser(@PathVariable @NonNull Long id) {
+    public ResponseEntity<?> disableUser(@PathVariable @NonNull Long id,
+                                         @AuthenticationPrincipal User currentUser) {
         try {
             userService.disableUser(id);
+            log.info("AUDIT admin.disableUser actor={} targetUserId={}", currentUser.getUsername(), id);
             return ResponseEntity.ok(Map.of("message", "User disabled successfully"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -134,9 +149,11 @@ public class UserAdminController {
      * @return no content on success
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable @NonNull Long id) {
+    public ResponseEntity<?> deleteUser(@PathVariable @NonNull Long id,
+                                        @AuthenticationPrincipal User currentUser) {
         try {
             userService.deleteUser(id);
+            log.info("AUDIT admin.deleteUser actor={} targetUserId={}", currentUser.getUsername(), id);
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)

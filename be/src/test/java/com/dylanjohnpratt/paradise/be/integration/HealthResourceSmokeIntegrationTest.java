@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -301,5 +302,128 @@ class HealthResourceSmokeIntegrationTest {
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("Metrics: update a single-series point's value + date via PUT /points/{index}")
+    void singleSeriesUpdatePointRoundTrip() throws Exception {
+        String metricId = createLineMetric("Weight", "lbs");
+        appendSinglePoint(metricId, 180, "2025-05-10");
+
+        // Update index 0: new value + an earlier date (which re-sorts, here a no-op for one point).
+        String body = "{\"value\":175,\"label\":\"2025-05-09\"}";
+        mockMvc.perform(put("/users/owner/health/metrics/" + metricId + "/points/0")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0]").value(175))
+                .andExpect(jsonPath("$.labels[0]").value("2025-05-09"));
+    }
+
+    @Test
+    @DisplayName("Metrics: update out-of-range point index → 400 HEALTH_VALIDATION_FAILED")
+    void updatePointOutOfRangeRejected() throws Exception {
+        String metricId = createLineMetric("Weight", "lbs");
+        appendSinglePoint(metricId, 180, "2025-05-10");
+
+        String body = "{\"value\":175,\"label\":\"2025-05-10\"}";
+        mockMvc.perform(put("/users/owner/health/metrics/" + metricId + "/points/9")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("HEALTH_VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("Metrics: delete a single-series point via DELETE /points/{index}")
+    void singleSeriesDeletePointRoundTrip() throws Exception {
+        String metricId = createLineMetric("Weight", "lbs");
+        appendSinglePoint(metricId, 180, "2025-05-10");
+        appendSinglePoint(metricId, 182, "2025-05-11");
+
+        // Delete index 0 → only the second (later) point remains.
+        mockMvc.perform(delete("/users/owner/health/metrics/" + metricId + "/points/0")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0]").value(182))
+                .andExpect(jsonPath("$.labels[0]").value("2025-05-11"));
+    }
+
+    @Test
+    @DisplayName("Metrics: update a multi-series (BP) point updates both series at the index")
+    void multiSeriesUpdatePointRoundTrip() throws Exception {
+        String bpId = bpMetricId();
+        String append = "{\"values\":[{\"label\":\"Systolic\",\"value\":120},"
+                + "{\"label\":\"Diastolic\",\"value\":80}],\"label\":\"2025-05-14\"}";
+        mockMvc.perform(post("/users/owner/health/metrics/" + bpId + "/points")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(append))
+                .andExpect(status().isOk());
+
+        String update = "{\"values\":[{\"label\":\"Systolic\",\"value\":118},"
+                + "{\"label\":\"Diastolic\",\"value\":76}],\"label\":\"2025-05-14\"}";
+        mockMvc.perform(put("/users/owner/health/metrics/" + bpId + "/points/0")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(update))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.datasets[?(@.label=='Systolic')].data[0]").value(118))
+                .andExpect(jsonPath("$.datasets[?(@.label=='Diastolic')].data[0]").value(76));
+    }
+
+    @Test
+    @DisplayName("Metrics: update a seeded metric's settings (name/unit/colors) is allowed")
+    void updateSeededMetricSettingsAllowed() throws Exception {
+        String bpId = bpMetricId();
+        String body = "{\"name\":\"BP (mmHg)\",\"unit\":\"mmHg\",\"colors\":[\"#ff0000\",\"#0000ff\"]}";
+        mockMvc.perform(put("/users/owner/health/metrics/" + bpId)
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("BP (mmHg)"))
+                .andExpect(jsonPath("$.unit").value("mmHg"))
+                .andExpect(jsonPath("$.seeded").value(true));
+    }
+
+    // ---- helpers for metric point edit/delete tests ----
+
+    private String bpMetricId() throws Exception {
+        MvcResult listResult = mockMvc.perform(get("/users/owner/health/metrics")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andReturn();
+        com.fasterxml.jackson.databind.JsonNode arr =
+                objectMapper.readTree(listResult.getResponse().getContentAsString());
+        for (com.fasterxml.jackson.databind.JsonNode node : arr) {
+            if ("bp".equals(node.get("slug").asText())) {
+                return node.get("id").asText();
+            }
+        }
+        throw new AssertionError("seeded bp metric not found");
+    }
+
+    private String createLineMetric(String name, String unit) throws Exception {
+        String body = "{\"name\":\"" + name + "\",\"type\":\"line\",\"unit\":\"" + unit
+                + "\",\"colors\":[\"#00e5ff\"]}";
+        MvcResult res = mockMvc.perform(post("/users/owner/health/metrics")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(res.getResponse().getContentAsString()).get("id").asText();
+    }
+
+    private void appendSinglePoint(String metricId, int value, String label) throws Exception {
+        String body = "{\"value\":" + value + ",\"label\":\"" + label + "\"}";
+        mockMvc.perform(post("/users/owner/health/metrics/" + metricId + "/points")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(body))
+                .andExpect(status().isOk());
     }
 }

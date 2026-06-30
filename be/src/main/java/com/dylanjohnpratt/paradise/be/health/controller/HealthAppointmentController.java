@@ -6,6 +6,8 @@ import com.dylanjohnpratt.paradise.be.dto.HealthAppointmentResponse;
 import com.dylanjohnpratt.paradise.be.health.service.HealthAppointmentService;
 import com.dylanjohnpratt.paradise.be.model.User;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,6 +21,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/users/{userId}/health/appointments")
 public class HealthAppointmentController {
+
+    private static final Logger log = LoggerFactory.getLogger(HealthAppointmentController.class);
 
     private final HealthAppointmentService appointmentService;
 
@@ -39,6 +43,7 @@ public class HealthAppointmentController {
             @Valid @RequestBody HealthAppointmentRequest request,
             @AuthenticationPrincipal User currentUser) {
         HealthAppointmentResponse response = appointmentService.create(userId, request, currentUser);
+        log.info("AUDIT health.appointment.create user={} targetUser={}", currentUser.getUsername(), userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -48,7 +53,10 @@ public class HealthAppointmentController {
             @PathVariable String appointmentId,
             @Valid @RequestBody HealthAppointmentPatchRequest request,
             @AuthenticationPrincipal User currentUser) {
-        return ResponseEntity.ok(appointmentService.patch(userId, appointmentId, request, currentUser));
+        HealthAppointmentResponse response = appointmentService.patch(userId, appointmentId, request, currentUser);
+        log.info("AUDIT health.appointment.patch user={} targetUser={} appointmentId={}",
+                currentUser.getUsername(), userId, appointmentId);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{appointmentId}")
@@ -57,6 +65,8 @@ public class HealthAppointmentController {
             @PathVariable String appointmentId,
             @AuthenticationPrincipal User currentUser) {
         appointmentService.delete(userId, appointmentId, currentUser);
+        log.info("AUDIT health.appointment.delete user={} targetUser={} appointmentId={}",
+                currentUser.getUsername(), userId, appointmentId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -5,6 +5,8 @@ import com.dylanjohnpratt.paradise.be.model.DailyTask;
 import com.dylanjohnpratt.paradise.be.model.TodoTask;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.NonNull;
@@ -24,6 +26,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/users/{userId}/tasks")
 public class TaskController {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskController.class);
 
     private final TaskService taskService;
 
@@ -63,6 +67,8 @@ public class TaskController {
             @RequestBody TodoTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
         TodoTask task = taskService.createTodoTask(userId, request, currentUser.getUsername());
+        log.info("AUDIT task.createTodo user={} targetUser={} taskId={}",
+                currentUser.getUsername(), userId, request.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -82,6 +88,8 @@ public class TaskController {
             @RequestBody DailyTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
         DailyTask task = taskService.createDailyTask(userId, request, currentUser.getUsername());
+        log.info("AUDIT task.createDaily user={} targetUser={} taskId={}",
+                currentUser.getUsername(), userId, request.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(task);
     }
 
@@ -103,6 +111,8 @@ public class TaskController {
             @RequestBody TodoTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
         TodoTask task = taskService.updateTodoTask(userId, id, request, currentUser.getUsername());
+        log.info("AUDIT task.updateTodo user={} targetUser={} taskId={}",
+                currentUser.getUsername(), userId, id);
         return ResponseEntity.ok(task);
     }
 
@@ -125,6 +135,8 @@ public class TaskController {
             @RequestBody DailyTaskRequest request,
             @AuthenticationPrincipal User currentUser) {
         DailyTask task = taskService.updateDailyTask(userId, id, request, currentUser.getUsername());
+        log.info("AUDIT task.updateDaily user={} targetUser={} taskId={}",
+                currentUser.getUsername(), userId, id);
         return ResponseEntity.ok(task);
     }
 
@@ -143,6 +155,8 @@ public class TaskController {
             @PathVariable @NonNull String id,
             @AuthenticationPrincipal User currentUser) {
         taskService.deleteTodoTask(userId, id, currentUser.getUsername());
+        log.info("AUDIT task.deleteTodo user={} targetUser={} taskId={}",
+                currentUser.getUsername(), userId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -160,6 +174,8 @@ public class TaskController {
             @PathVariable @NonNull String id,
             @AuthenticationPrincipal User currentUser) {
         taskService.deleteDailyTask(userId, id, currentUser.getUsername());
+        log.info("AUDIT task.deleteDaily user={} targetUser={} taskId={}",
+                currentUser.getUsername(), userId, id);
         return ResponseEntity.noContent().build();
     }
 
