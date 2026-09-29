@@ -30,4 +30,10 @@ public class DocsExceptionHandler {
         ErrorResponse error = new ErrorResponse("DOCS_INVALID_FILE_TYPE", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
+
+    @ExceptionHandler(DocsFileTooLargeException.class)
+    public ResponseEntity<ErrorResponse> handleFileTooLarge(DocsFileTooLargeException ex) {
+        ErrorResponse error = new ErrorResponse("DOCS_FILE_TOO_LARGE", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(error);
+    }
 }
