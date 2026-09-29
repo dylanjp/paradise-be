@@ -76,6 +76,12 @@
       "type": "java.lang.Long",
       "description": "Cache TTL in milliseconds for the warm-up scheduler refresh interval.",
       "defaultValue": 7200000
+    },
+    {
+      "name": "docs.refresh-millis",
+      "type": "java.lang.Long",
+      "description": "Interval in milliseconds between automatic rebuilds of the documentation tree and embed index.",
+      "defaultValue": 3600000
     }
   ]
 }
