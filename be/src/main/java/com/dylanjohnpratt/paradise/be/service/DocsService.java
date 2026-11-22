@@ -47,8 +47,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Service for browsing and retrieving documentation files across the configured roots
- * (DOCS_PATH, plus the admin-only "LE Docs" and "Pratt Capitol" Obsidian vaults).
+ * Service for browsing and retrieving documentation files across the configured sections of the
+ * Obsidian vault (see {@link DocsRoots}). Every section is a top-level folder of the tree; admin-only
+ * sections are hidden from users without ROLE_ADMIN.
  * <p>
  * Builds and caches a {@link DocsSnapshot} (tree + embed name index), filters the tree per user,
  * serves text documents (md, canvas) and binary previews (pdf, images), and resolves Obsidian embeds
@@ -149,7 +150,7 @@ public class DocsService {
 
     /**
      * Returns the cached tree, building it on first use.
-     * Admin-only root folders are removed for users without ROLE_ADMIN.
+     * Admin-only section folders are removed for users without ROLE_ADMIN.
      */
     public DocsTreeNode getFileTree(User user) {
         DocsTreeNode full = snapshot().fullTree();
@@ -390,15 +391,15 @@ public class DocsService {
     }
 
     /**
-     * Routes a tree path: a first segment exactly equal to a configured extra root's label goes to that
-     * root (404 when it is admin-only and the user is not an admin, or when it is not currently mounted);
-     * anything else goes to the main root.
+     * Routes a tree path by its first segment, which must exactly equal a configured section's label.
+     * 404 when no section matches, when the section is admin-only and the user is not an admin, or when
+     * the section is not currently mounted.
      */
     private Route route(String path, User user, DocsSnapshot snap) {
         int slash = path.indexOf('/');
         String first = slash >= 0 ? path.substring(0, slash) : path;
-        for (DocsRoots.Entry entry : docsRoots.configured()) {
-            if (entry.isMain() || !entry.label().equals(first)) {
+        for (DocsRoots.Entry entry : docsRoots.entries()) {
+            if (!entry.label().equals(first)) {
                 continue;
             }
             if (entry.adminOnly() && !isAdmin(user)) {
@@ -407,8 +408,7 @@ public class DocsService {
             ActiveRoot root = snap.root(entry.label()).orElseThrow(() -> notFound(path));
             return new Route(root, slash >= 0 ? path.substring(slash + 1) : "");
         }
-        ActiveRoot main = snap.root("").orElseThrow(() -> notFound(path));
-        return new Route(main, path);
+        throw notFound(path);
     }
 
     /** String-only checks, safe to run before routing: blank/NUL are 404, rooted or drive-prefixed is 403. */
@@ -480,7 +480,10 @@ public class DocsService {
         return keys;
     }
 
-    /** Hides admin-only vault content from non-admins even when it sits inside an open root or scope. */
+    /**
+     * Hides admin-only sections from non-admins. Every section shares the vault scope, so an embed from an
+     * open section could otherwise reach an image stored in an admin-only one.
+     */
     private static boolean visibleTo(Path real, User user, DocsSnapshot snap) {
         if (isAdmin(user)) {
             return true;
@@ -576,33 +579,21 @@ public class DocsService {
     private DocsSnapshot buildSnapshot() {
         List<ActiveRoot> roots = docsRoots.resolveActive();
         List<Path> adminOnlyDirs = roots.stream().filter(ActiveRoot::adminOnly).map(ActiveRoot::dir).toList();
-        Set<String> extraLabels = docsRoots.configured().stream()
-                .filter(e -> !e.isMain())
-                .map(DocsRoots.Entry::label)
-                .collect(Collectors.toSet());
 
         List<DocsTreeNode> topLevel = new ArrayList<>();
         for (ActiveRoot root : roots) {
             List<Path> excluded = root.adminOnly() ? List.of() : adminOnlyDirs;
             List<DocsTreeNode> children;
             if (isInside(root.dir(), excluded)) {
-                log.warn("Docs root {} lies inside an admin-only root; its content is listed only there",
-                        root.isMain() ? "docs.path" : root.label());
+                log.warn("Docs section {} lies inside an admin-only section; its content is listed only there",
+                        root.label());
                 children = List.of();
             } else {
                 Set<Path> visited = new HashSet<>();
                 visited.add(root.dir());
-                String prefix = root.isMain() ? "" : root.label() + "/";
-                children = buildChildren(root.dir(), root.dir(), prefix, excluded, visited);
+                children = buildChildren(root.dir(), root.dir(), root.label() + "/", excluded, visited);
             }
-            if (root.isMain()) {
-                // A top-level folder named like a configured vault root is shadowed by routing.
-                children.stream()
-                        .filter(n -> !extraLabels.contains(n.name()))
-                        .forEach(topLevel::add);
-            } else {
-                topLevel.add(new DocsTreeNode(root.label(), "folder", root.label(), children, Boolean.TRUE));
-            }
+            topLevel.add(new DocsTreeNode(root.label(), "folder", root.label(), children, Boolean.TRUE));
         }
         topLevel.sort(TREE_ORDER);
         DocsTreeNode tree = new DocsTreeNode("", "folder", "", List.copyOf(topLevel), null);

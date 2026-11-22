@@ -167,7 +167,31 @@ class NotificationLifecycleIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.isRead").value(true));
 
-        // Step 4: User1 converts the action item to a todo task
+        // Step 4: Creating a non-recurring notification with an action item already gave
+        // user1 the todo, owned by username (the {userId} used by /users/{userId}/tasks)
+        MvcResult tasksResult = mockMvc.perform(get("/users/{userId}/tasks", user1Username)
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todoTasks.Profile", hasSize(1)))
+                .andExpect(jsonPath("$.todoTasks.Profile[0].description").value("Update profile information"))
+                .andExpect(jsonPath("$.todoTasks.Profile[0].userId").value(user1Username))
+                .andExpect(jsonPath("$.todoTasks.Profile[0].sourceNotificationId").value(notificationId))
+                .andReturn();
+        String autoTodoId = objectMapper.readTree(tasksResult.getResponse().getContentAsString())
+                .at("/todoTasks/Profile/0/id").asText();
+
+        // Step 5: Converting the action item again is rejected instead of creating a duplicate
+        mockMvc.perform(post("/api/notifications/{id}/action", notificationId)
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("ALREADY_ACTIONED"));
+
+        // Step 6: After user1 deletes that todo, converting the action item creates a new one
+        // in user1's own task list
+        mockMvc.perform(delete("/users/{userId}/tasks/todo/{id}", user1Username, autoTodoId)
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isNoContent());
+
         mockMvc.perform(post("/api/notifications/{id}/action", notificationId)
                 .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isCreated())
@@ -175,9 +199,15 @@ class NotificationLifecycleIntegrationTest {
                 .andExpect(jsonPath("$.category").value("Profile"))
                 .andExpect(jsonPath("$.createdFromNotification").value(true))
                 .andExpect(jsonPath("$.sourceNotificationId").value(notificationId))
-                .andReturn();
+                .andExpect(jsonPath("$.userId").value(user1Username));
 
-        // Step 5: Verify duplicate action is prevented
+        mockMvc.perform(get("/users/{userId}/tasks", user1Username)
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.todoTasks.Profile", hasSize(1)))
+                .andExpect(jsonPath("$.todoTasks.Profile[0].sourceNotificationId").value(notificationId));
+
+        // Step 7: Verify duplicate action is prevented
         mockMvc.perform(post("/api/notifications/{id}/action", notificationId)
                 .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isConflict());

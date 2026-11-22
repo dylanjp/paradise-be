@@ -123,11 +123,24 @@ public class UserService implements UserDetailsService {
      */
     @Transactional
     public void disableUser(@NonNull Long userId) {
+        setEnabled(userId, false);
+    }
+
+    /**
+     * Enables or disables a user account.
+     *
+     * @param userId the ID of the user
+     * @param enabled true to enable the account, false to disable it
+     * @return the updated user
+     * @throws IllegalArgumentException if user is not found
+     */
+    @Transactional
+    public User setEnabled(@NonNull Long userId, boolean enabled) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + userId));
-        
-        user.setEnabled(false);
-        userRepository.save(user);
+
+        user.setEnabled(enabled);
+        return userRepository.save(user);
     }
 
     /**

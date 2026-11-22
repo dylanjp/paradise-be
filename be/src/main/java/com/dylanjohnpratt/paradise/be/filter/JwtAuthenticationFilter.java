@@ -24,6 +24,7 @@ import java.io.IOException;
  * - Extracts the Authorization header from incoming requests
  * - Checks for "Bearer " prefix and extracts the token
  * - Validates the token via JwtService
+ * - Rejects tokens for disabled accounts, so disabling a user revokes their access immediately
  * - If valid, creates UsernamePasswordAuthenticationToken and sets SecurityContext
  */
 @Component
@@ -64,8 +65,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // Load user details from database
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 
-                // Validate token against user details
-                if (jwtService.isTokenValid(token, userDetails)) {
+                // Validate token against user details. A disabled account is rejected even
+                // with an unexpired token, so disabling a user takes effect immediately.
+                if (!userDetails.isEnabled()) {
+                    logger.debug("JWT rejected: account disabled for user " + username);
+                } else if (jwtService.isTokenValid(token, userDetails)) {
                     // Create authentication token
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,

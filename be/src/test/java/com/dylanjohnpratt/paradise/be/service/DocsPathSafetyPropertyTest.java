@@ -1,6 +1,5 @@
 package com.dylanjohnpratt.paradise.be.service;
 
-import com.dylanjohnpratt.paradise.be.config.DocsPathProperties;
 import com.dylanjohnpratt.paradise.be.exception.DocsFileNotFoundException;
 import com.dylanjohnpratt.paradise.be.exception.DocsFileTooLargeException;
 import com.dylanjohnpratt.paradise.be.exception.DocsInvalidFileTypeException;
@@ -31,12 +30,16 @@ class DocsPathSafetyPropertyTest {
 
     /** Real names from the fixture, so a fair share of tries reach an existing file. */
     private static final String[] NAMES = {
-            "Home", "Basement.md", "Alpha.md", "zeta.md", "Insurance", "Car Insurance", "ID Card.pdf",
-            "LE Docs", "Amira Artwork.md", "IP Management", "Lamaryah WorldBuilding", "Attachments",
-            "Pictures", "Amira", "Official_Amira_Artwork1.jpg", ".obsidian", "app.json", ".trash", "x.md",
-            "trashed.png", "secret.png", "server.png", "shared.png", "icon.png", "outside.png", "TechVault",
-            "Documentation", "Welcome.md", "Screenshot 1.png", "logo.svg", "My Pic.png", ".png", ".md",
-            "Home/Basement.md", "Insurance/Car Insurance/ID Card.pdf", "LE Docs/Amira Artwork.md", "Home/../Alpha.md"
+            "Home and Family", "Home and Family", "LLCs", "Dylan Personal", "Home", "Basement.md", "Alpha.md",
+            "zeta.md", "Insurance", "Car Insurance", "ID Card.pdf", "LegendaryEpics", "Amira Artwork.md",
+            "IP Management", "Lamaryah WorldBuilding", "Attachments", "Pictures", "Amira",
+            "Official_Amira_Artwork1.jpg", ".obsidian", "app.json", ".trash", "x.md", "trashed.png", "secret.png",
+            "server.png", "shared.png", "icon.png", "outside.png", "Vault", "Accounts", "Accounts.md",
+            "private.png", "Welcome.md", "Screenshot 1.png", "logo.svg", "My Pic.png", ".png", ".md",
+            "Home and Family/Home/Basement.md", "Home and Family/Insurance/Car Insurance/ID Card.pdf",
+            "LLCs/LegendaryEpics/Amira Artwork.md", "Home and Family/Home/../Alpha.md",
+            "Home and Family/../LLCs/LegendaryEpics/Amira Artwork.md", "Dylan Personal/Accounts/private.png",
+            "Home and Family/../Dylan Personal/Accounts/private.png"
     };
 
     private static final User ADMIN = new User("admin", "password", Set.of("ROLE_ADMIN", "ROLE_USER"));
@@ -46,7 +49,8 @@ class DocsPathSafetyPropertyTest {
     private DocsFixture fx;
     private DocsService service;
     private Path realBase;
-    private Path realLe;
+    private Path realLlcs;
+    private Path realPersonal;
     private final AtomicInteger counter = new AtomicInteger();
 
     @BeforeProperty
@@ -54,15 +58,15 @@ class DocsPathSafetyPropertyTest {
         tempDir = Files.createTempDirectory("docs-safety-test-");
         fx = DocsFixture.create(tempDir);
         realBase = tempDir.toRealPath();
-        realLe = fx.le.toRealPath();
-        DocsRoots roots = new DocsRoots(new DocsPathProperties(fx.docs.toString(), fx.le.toString(), ""));
-        service = new DocsService(roots, new DocsCacheManager());
+        realLlcs = fx.llcs.toRealPath();
+        realPersonal = fx.personal.toRealPath();
+        service = new DocsService(fx.roots(), new DocsCacheManager());
     }
 
     /**
      * For any hostile tree path, resolveTreePath either throws a Docs* exception or returns a listed
-     * file type whose real path is inside the routed root, has no dot-element, and is never admin-only
-     * content for a non-admin.
+     * file type whose real path is inside the routed section, has no dot-element, and is never in an
+     * admin-only section for a non-admin.
      */
     @Property(tries = 500)
     void treePathsStayInsideTheirRoot(@ForAll("hostilePaths") String path, @ForAll boolean asAdmin) {
@@ -81,13 +85,15 @@ class DocsPathSafetyPropertyTest {
         assertThat(Files.isRegularFile(real)).isTrue();
         if (!asAdmin) {
             assertThat(file.root().adminOnly()).isFalse();
-            assertThat(real.startsWith(realLe)).isFalse();
+            assertThat(real.startsWith(realLlcs)).isFalse();
+            assertThat(real.startsWith(realPersonal)).isFalse();
         }
     }
 
     /**
      * For any hostile embed target referenced by a note, resolveEmbed either throws a Docs* exception or
-     * returns a pdf/image inside the note root's vault scope, with no dot-element, never outside the fixture.
+     * returns a pdf/image inside the vault scope, with no dot-element, never outside the fixture,
+     * and never in an admin-only section for a non-admin.
      */
     @Property(tries = 400)
     void embedsStayInsideTheVaultScope(@ForAll("hostileTargets") String target,
@@ -96,10 +102,11 @@ class DocsPathSafetyPropertyTest {
                                        @ForAll boolean asAdmin) throws IOException {
         // A fresh note that references the target both ways, so most tries pass the reference gate.
         String name = "gen-" + counter.incrementAndGet() + ".md";
-        Path dir = fromLe ? fx.lamaryah.resolve("Characters/Gen") : fx.docs.resolve("Home/Gen");
+        Path dir = fromLe ? fx.lamaryah.resolve("Characters/Gen") : fx.home.resolve("Home/Gen");
         Files.createDirectories(dir);
         Files.writeString(dir.resolve(name), "![[" + target + "]]\n![](" + target + ")\n", StandardCharsets.UTF_8);
-        String from = (fromLe ? "LE Docs/IP Management/Lamaryah WorldBuilding/Characters/Gen/" : "Home/Gen/") + name;
+        String from = (fromLe ? DocsFixture.LE + "/IP Management/Lamaryah WorldBuilding/Characters/Gen/"
+                : DocsFixture.h("Home/Gen/")) + name;
         User user = asAdmin ? ADMIN : REGULAR;
 
         ResolvedFile file;
@@ -117,7 +124,8 @@ class DocsPathSafetyPropertyTest {
         assertThat(DocsFileTypes.isBinary(real.getFileName().toString())).isTrue();
         assertThat(Files.isRegularFile(real)).isTrue();
         if (!asAdmin) {
-            assertThat(real.startsWith(realLe)).isFalse();
+            assertThat(real.startsWith(realLlcs)).isFalse();
+            assertThat(real.startsWith(realPersonal)).isFalse();
         }
     }
 
