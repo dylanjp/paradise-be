@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * Represents a node in the documentation file tree.
  * For folders, children is a non-null list; for files, children is null.
- * {@code root} is true only on the top-level folder of an extra vault ("LE Docs", "Pratt Capitol")
+ * {@code root} is true only on the top-level folder of a vault section (for example "Home and Family")
  * and is omitted from the JSON everywhere else.
  */
 public record DocsTreeNode(

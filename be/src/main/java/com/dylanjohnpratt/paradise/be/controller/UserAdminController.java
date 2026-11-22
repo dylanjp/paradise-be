@@ -3,6 +3,7 @@ package com.dylanjohnpratt.paradise.be.controller;
 import com.dylanjohnpratt.paradise.be.dto.CreateUserRequest;
 import com.dylanjohnpratt.paradise.be.dto.ResetPasswordRequest;
 import com.dylanjohnpratt.paradise.be.dto.UpdateRolesRequest;
+import com.dylanjohnpratt.paradise.be.dto.UpdateUserStatusRequest;
 import com.dylanjohnpratt.paradise.be.model.User;
 import com.dylanjohnpratt.paradise.be.service.UserService;
 import org.slf4j.Logger;
@@ -136,6 +137,38 @@ public class UserAdminController {
             userService.disableUser(id);
             log.info("AUDIT admin.disableUser actor={} targetUserId={}", currentUser.getUsername(), id);
             return ResponseEntity.ok(Map.of("message", "User disabled successfully"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Enables or disables a user account. This is the endpoint the admin page's
+     * enable/disable toggle calls.
+     *
+     * @param id the user ID
+     * @param request the status request containing the new enabled flag
+     * @return the updated user
+     */
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable @NonNull Long id,
+                                          @RequestBody(required = false) UpdateUserStatusRequest request,
+                                          @AuthenticationPrincipal User currentUser) {
+        if (request == null || request.enabled() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "enabled is required"));
+        }
+        try {
+            User user = userService.setEnabled(id, request.enabled());
+            log.info("AUDIT admin.updateStatus actor={} targetUserId={} enabled={}",
+                    currentUser.getUsername(), id, request.enabled());
+            return ResponseEntity.ok(Map.of(
+                    "id", user.getId(),
+                    "username", user.getUsername(),
+                    "roles", user.getRoles(),
+                    "enabled", user.isEnabled()
+            ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));

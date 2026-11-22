@@ -8,30 +8,33 @@ Base URL: `http://localhost:8180`
 
 ---
 
-## Roots
+## Sections
 
-The tree combines up to three filesystem roots:
+The docs come from one Obsidian vault (`DOCS_VAULT_PATH`). Each listed top-level folder of the vault is a **section**: a top-level folder of the tree with the same name. Tree paths are therefore the same as vault paths (`Home and Family/House Documentation/...`).
 
-| Root | Env var | Where it appears in the tree | Who can see and read it |
-|------|---------|------------------------------|-------------------------|
-| Main docs folder | `DOCS_PATH` | Directly under the tree root; paths are unchanged from earlier versions (`Insurance/Insurance Overview.md`) | Every signed-in user |
-| LegendaryEpics vault | `LE_DOCS_PATH` | Top-level folder **`LE Docs`**; paths start with `LE Docs/` | `ROLE_ADMIN` only |
-| Pratt Capitol vault | `PRATT_CAPITOL_PATH` | Top-level folder **`Pratt Capitol`**; paths start with `Pratt Capitol/` | `ROLE_ADMIN` only |
+| Section (default) | Listed in | Who can see and read it |
+|-------------------|-----------|-------------------------|
+| `Home and Family` | `DOCS_FOLDERS` | Every signed-in user |
+| `Dylan Personal` | `DOCS_ADMIN_FOLDERS` | `ROLE_ADMIN` only |
+| `LLCs` | `DOCS_ADMIN_FOLDERS` | `ROLE_ADMIN` only |
 
-- All three are optional. An unset or blank variable disables that root.
-- A root that doesn't exist (for example, an unmounted drive) is skipped and re-checked on every refresh, so it appears once the folder exists.
-- For users without `ROLE_ADMIN`, the admin-only folders are **removed from the tree**, and every request for a path under them returns **404**, whether or not the file exists. Their existence is never revealed.
-- Routing is by exact first path segment: `LE Docs/...` goes to the LE vault; anything else goes to `DOCS_PATH`. A top-level `DOCS_PATH` folder with the same name as a configured vault folder is shadowed and not listed. The server logs a warning at startup.
-- Admin-only vault content is also hidden from non-admins when it lies inside `DOCS_PATH` or its vault scope, in case the roots are ever configured to overlap.
+- `DOCS_FOLDERS` and `DOCS_ADMIN_FOLDERS` are comma-separated folder names. A name must be a single folder directly under the vault: no `/`, `\`, `:` or leading `.`. Invalid names and duplicates are logged and ignored. A folder in both lists is admin-only.
+- Vault content outside the listed sections (`Attachments/`, notes at the vault root, other folders) is never listed or opened from the tree. Notes can still embed images and PDFs from it; see `/docs/embed`.
+- An unset `DOCS_VAULT_PATH` disables the feature. A section that doesn't exist (for example, an unmounted drive or a renamed folder) is skipped and re-checked on every refresh, so it appears once the folder exists. An existing section with no listed files is still shown.
+- For users without `ROLE_ADMIN`, admin-only sections are **removed from the tree**, and every request for a path under them returns **404**, whether or not the file exists. Their existence is never revealed.
+- Routing is by exact first path segment, which must be a section's name (case-sensitive). Anything else returns **404**.
+- Every section shares the vault's scope for embeds, so admin-only sections are also hidden from non-admins when an open note embeds a file stored in one.
 
 Configuration (`application.properties`):
 
 ```properties
-docs.path=${DOCS_PATH:}
-docs.le-path=${LE_DOCS_PATH:}
-docs.pratt-capitol-path=${PRATT_CAPITOL_PATH:}
+docs.vault-path=${DOCS_VAULT_PATH:}
+docs.folders=${DOCS_FOLDERS:Home and Family}
+docs.admin-folders=${DOCS_ADMIN_FOLDERS:Dylan Personal,LLCs}
 docs.refresh-millis=3600000   # auto-refresh interval, default 1 hour
 ```
+
+Before 2026-11-21 (v1.0.4) the tree combined three separate vaults (`DOCS_PATH` at the tree root, plus the admin-only `LE Docs` and `Pratt Capitol` folders). Those variables are now ignored.
 
 ---
 
@@ -68,43 +71,45 @@ Returns the folder/file tree visible to the caller.
   "path": "",
   "children": [
     {
-      "name": "Insurance",
+      "name": "Home and Family",
       "type": "folder",
-      "path": "Insurance",
+      "path": "Home and Family",
+      "root": true,
       "children": [
         {
-          "name": "ID Card.pdf",
-          "type": "file",
-          "path": "Insurance/ID Card.pdf",
-          "children": null
+          "name": "Insurance",
+          "type": "folder",
+          "path": "Home and Family/Insurance",
+          "children": [
+            {
+              "name": "ID Card.pdf",
+              "type": "file",
+              "path": "Home and Family/Insurance/ID Card.pdf",
+              "children": null
+            }
+          ]
         }
       ]
     },
     {
-      "name": "LE Docs",
+      "name": "LLCs",
       "type": "folder",
-      "path": "LE Docs",
+      "path": "LLCs",
       "root": true,
       "children": [
         {
           "name": "Amira Board.canvas",
           "type": "file",
-          "path": "LE Docs/IP Management/Amira Board.canvas",
+          "path": "LLCs/LegendaryEpics/IP Management/Amira Board.canvas",
           "children": null
         }
       ]
-    },
-    {
-      "name": "README.md",
-      "type": "file",
-      "path": "README.md",
-      "children": null
     }
   ]
 }
 ```
 
-(The `Amira Board.canvas` node is shortened. Its real parent folders are omitted.)
+(The `Amira Board.canvas` node is shortened. Its real parent folders are omitted. `LLCs` appears only for admins.)
 
 **Node shape:**
 
@@ -112,14 +117,14 @@ Returns the folder/file tree visible to the caller.
 |------------|----------------------------|-------------|
 | `name`     | `string`                   | File or folder name (empty string for the tree root). |
 | `type`     | `"folder"` or `"file"`     | Node type. |
-| `path`     | `string`                   | Path to pass to the other endpoints, using `/` separators. Vault content is prefixed with its root label (`LE Docs/...`). |
+| `path`     | `string`                   | Path to pass to the other endpoints, using `/` separators. It is the file's path in the vault, so it always starts with its section (`Home and Family/...`). |
 | `children` | `DocsTreeNode[]` or `null` | Non-null array for folders, `null` for files. |
-| `root`     | `true` (optional)          | Present only on the top-level folder of an extra vault (`LE Docs`, `Pratt Capitol`). **Omitted** on every other node, including the tree root. |
+| `root`     | `true` (optional)          | Present only on a section's top-level folder. **Omitted** on every other node, including the tree root. |
 
 Notes:
-- The tree root always has `name: ""`, `path: ""`, `type: "folder"`, and no `root` field.
-- Only the file types above are listed. Folders with no listed files anywhere inside are pruned. A configured vault's root folder is always shown to admins, even when it is empty.
-- Children are sorted folders first, then case-insensitively by name. Vault root folders are sorted with the other top-level folders.
+- The tree root always has `name: ""`, `path: ""`, `type: "folder"`, and no `root` field. Its children are the sections the caller may see, and nothing else.
+- Only the file types above are listed. Folders with no listed files anywhere inside are pruned. A section's folder is always shown, even when it is empty.
+- Children are sorted folders first, then case-insensitively by name.
 - Symlinks and Windows junctions are followed only when their real target stays inside the same root. A folder already visited through another link is skipped, so link loops terminate.
 - The tree is cached server-side. It is rebuilt every `docs.refresh-millis` (default **1 hour**) and on `POST /docs/refresh`.
 - With no roots configured, the response is an empty root: `{ "name": "", "type": "folder", "path": "", "children": [] }`.
@@ -146,7 +151,7 @@ Returns the text of a Markdown or Canvas document.
 
 | Param  | Type     | Required | Description |
 |--------|----------|----------|-------------|
-| `path` | `string` | yes      | A file `path` from the tree, e.g. `Insurance/Insurance Overview.md` or `LE Docs/IP Management/Amira Board.canvas`. |
+| `path` | `string` | yes      | A file `path` from the tree, e.g. `Home and Family/Insurance/Insurance Overview.md` or `LLCs/LegendaryEpics/IP Management/Amira Board.canvas`. |
 
 **Response:** `200 OK`
 - `.md` → `text/markdown;charset=UTF-8`, raw Markdown.
@@ -162,7 +167,7 @@ Streams a PDF or image listed in the tree.
 
 | Param  | Type     | Required | Description |
 |--------|----------|----------|-------------|
-| `path` | `string` | yes      | A file `path` from the tree, e.g. `Insurance/Car Insurance/ID Card.pdf`. |
+| `path` | `string` | yes      | A file `path` from the tree, e.g. `Home and Family/Insurance/Car Insurance/ID Card.pdf`. |
 
 **Response:** `200 OK` with the file bytes. Headers:
 
@@ -178,7 +183,7 @@ Streams a PDF or image listed in the tree.
 
 **Errors:** `400` for md/canvas or unlisted types, `403` traversal, `404` missing, hidden, or not permitted.
 
-Every successful call writes an audit log line: `AUDIT docs.raw user=<username> root=<docs|LE Docs|Pratt Capitol> path=<vault-scope-relative path>`.
+Every successful call writes an audit log line: `AUDIT docs.raw user=<username> root=<section> path=<vault-relative path>`.
 
 ---
 
@@ -199,9 +204,10 @@ Resolves an image or PDF that a note or canvas embeds, the way Obsidian does, an
 4. Reject NUL, drive prefixes (`C:`), UNC/device/rooted paths, and anything the OS can't parse. These return `404`.
 5. The target must end in a PDF or image extension. Otherwise the request returns `400`.
 
-**Resolution.** Everything happens within the **vault scope** of the root that `from` belongs to:
-- The vault scope is the nearest folder at or above the root that contains `.obsidian`. If there is none, it is the root itself.
-- Example: with `DOCS_PATH = …\Dylan's Tech Vault\Documentation`, the scope is `Dylan's Tech Vault`, so canvases in `Documentation/` can show images from the vault-level `Attachments/`.
+**Resolution.** Everything happens within the **vault scope** of the section that `from` belongs to:
+- The vault scope is the nearest folder at or above the section that contains `.obsidian`: normally the vault itself, shared by every section. If there is none, it is the section folder.
+- Example: a canvas in `Home and Family/` can show images from the vault-level `Attachments/`.
+- Files inside an admin-only section are never served to a non-admin, even when an open note embeds them.
 
 1. **`from` check.** `from` must be a readable `.md` / `.canvas` tree file for the caller, with the same rules as `/docs/file`.
 2. **Reference gate.** `from` must actually reference the target. The server extracts the targets of `[[...]]`, `![[...]]`, Markdown link/image destinations (raw and percent-decoded, `<...>` form, and reference definitions), and, for canvases, every node's `file` plus the Markdown in `text` nodes. Unreferenced targets return `404`.
@@ -228,11 +234,12 @@ Checks run in this order. The purely textual checks happen before any filesystem
 
 1. Blank or NUL → `404`.
 2. A leading `/` or `\`, a drive prefix (`C:`), or a rooted path after routing → `403 DOCS_PATH_TRAVERSAL`.
-3. After routing to a root and normalizing `.`/`..`, a path outside that root → `403 DOCS_PATH_TRAVERSAL`. Examples: `../x.md`, `LE Docs/../../x`.
-4. Any path element starting with `.` → `404`. Examples: `.obsidian/app.json`, `Insurance/../.trash/x.md`.
-5. Wrong extension for the endpoint → `400`.
-6. The file must exist and be a regular file. Its real path must stay inside the real root, contain no dot-element, and have an allowed extension. Otherwise → `404`.
-7. Paths the OS can't parse → `404`. Examples: `a:b.md` or `x<y>.md` on Windows. These never produce a generic validation error.
+3. A first segment that isn't a section name, or an admin-only section for a non-admin → `404`. Examples: `../x.md`, `Attachments/pic.png`.
+4. After routing to a section and normalizing `.`/`..`, a path outside that section → `403 DOCS_PATH_TRAVERSAL`. Examples: `Home and Family/../Welcome.md`, `Home and Family/../LLCs/x.md`.
+5. Any path element starting with `.` → `404`. Examples: `.obsidian/app.json`, `Home and Family/Insurance/../.trash/x.md`.
+6. Wrong extension for the endpoint → `400`.
+7. The file must exist and be a regular file. Its real path must stay inside the real section folder, contain no dot-element, and have an allowed extension. Otherwise → `404`.
+8. Paths the OS can't parse → `404`. Examples: `a:b.md` or `x<y>.md` on Windows. These never produce a generic validation error.
 
 ---
 
@@ -254,7 +261,7 @@ All errors return JSON with this shape:
 | 400    | (Spring default)         | A required query parameter is missing. |
 | 403    | —                        | Missing or invalid JWT token (no body contract). |
 | 403    | `DOCS_PATH_TRAVERSAL`    | Path escapes its root, or is absolute or drive-prefixed. |
-| 404    | `DOCS_FILE_NOT_FOUND`    | Missing, hidden (dot-path), outside the real root, in an admin-only root for a non-admin, unparsable, or an embed that is unreferenced or unresolved. |
+| 404    | `DOCS_FILE_NOT_FOUND`    | Missing, hidden (dot-path), not under a section, outside the real section folder, in an admin-only section for a non-admin, unparsable, or an embed that is unreferenced or unresolved. |
 | 413    | `DOCS_FILE_TOO_LARGE`    | A text document is larger than 32 MB. |
 
 ---
@@ -267,7 +274,7 @@ interface DocsTreeNode {
   type: "folder" | "file";
   path: string;
   children: DocsTreeNode[] | null;
-  root?: true; // only on "LE Docs" / "Pratt Capitol" top-level folders
+  root?: true; // only on section folders ("Home and Family", "LLCs", ...)
 }
 
 interface DocsErrorResponse {
@@ -295,17 +302,17 @@ const fresh: DocsTreeNode = await (
 
 // Markdown or canvas text
 const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
-const md = await (await fetch(`${API_BASE}/docs/file?${q({ path: "Insurance/Insurance Overview.md" })}`, auth)).text();
+const md = await (await fetch(`${API_BASE}/docs/file?${q({ path: "Home and Family/Insurance/Insurance Overview.md" })}`, auth)).text();
 
 // PDF or image from the tree → Blob → object URL
-const pdf = await (await fetch(`${API_BASE}/docs/raw?${q({ path: "Insurance/Car Insurance/ID Card.pdf" })}`, auth)).blob();
+const pdf = await (await fetch(`${API_BASE}/docs/raw?${q({ path: "Home and Family/Insurance/Car Insurance/ID Card.pdf" })}`, auth)).blob();
 const pdfUrl = URL.createObjectURL(pdf);
 
 // Image embedded by a canvas file node (literal) or a note (default)
 const img = await (
   await fetch(
     `${API_BASE}/docs/embed?${q({
-      from: "LE Docs/IP Management/Lamaryah WorldBuilding/Characters/Amira/Amira Board.canvas",
+      from: "LLCs/LegendaryEpics/IP Management/Lamaryah WorldBuilding/Characters/Amira/Amira Board.canvas",
       target: "Attachments/Pictures/Amira/Official_Amira_Artwork1.jpg",
       literal: "true",
     })}`,

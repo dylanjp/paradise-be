@@ -174,10 +174,12 @@ public class NotificationController {
     public ResponseEntity<TodoTask> convertToTodo(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long id) {
+        // Todo tasks are owned by username (the {userId} in /users/{userId}/tasks),
+        // not by the numeric user ID, so the new task shows up in the user's task list.
         TodoTask task = notificationService.convertActionItemToTodo(
                 id,
                 currentUser.getId(),
-                currentUser.getId().toString()
+                currentUser.getUsername()
         );
         log.info("AUDIT notification.convertToTodo user={} notificationId={}", currentUser.getUsername(), id);
         return ResponseEntity.status(HttpStatus.CREATED).body(task);

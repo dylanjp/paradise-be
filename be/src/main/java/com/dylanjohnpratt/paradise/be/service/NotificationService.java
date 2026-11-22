@@ -358,7 +358,8 @@ public class NotificationService {
      * 
      * @param notificationId the notification ID
      * @param userId the user ID (as Long for notification access check)
-     * @param userIdString the user ID as String (for TodoTask userId field)
+     * @param userIdString the task owner stored in TodoTask.userId; callers pass the username,
+     *                     which is how /users/{userId}/tasks looks tasks up
      * @return the created TodoTask with notification provenance fields set
      * @throws IllegalArgumentException if notification not found or not accessible
      * @throws IllegalStateException if notification has no action item

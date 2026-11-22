@@ -25,7 +25,8 @@ import java.nio.charset.StandardCharsets;
 /**
  * Read-only API for the Documentation page.
  * Serves the per-user docs tree, text documents (md, canvas), binary previews (pdf, images) and
- * Obsidian embeds from DOCS_PATH and the admin-only "LE Docs" / "Pratt Capitol" vaults.
+ * Obsidian embeds from the configured sections of the Obsidian vault (DOCS_VAULT_PATH); admin-only
+ * sections (DOCS_ADMIN_FOLDERS) are visible to ROLE_ADMIN only.
  * Binary responses are inline {@link FileSystemResource}s, so Spring adds Content-Length and
  * Range/206 support; Spring Security's default {@code Cache-Control: no-store} is kept on purpose so
  * vault files never land in disk caches.
@@ -144,7 +145,7 @@ public class DocsController {
     }
 
     private static String rootName(ResolvedFile file) {
-        return file.root().isMain() ? "docs" : file.root().label();
+        return file.root().label();
     }
 
     private static String sanitizeForLog(String value) {

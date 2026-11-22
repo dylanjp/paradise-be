@@ -7,20 +7,24 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
 
 /**
- * Builds a small copy of the real vault layouts for docs tests.
+ * Builds a small copy of the consolidated Obsidian vault for docs tests.
  * <pre>
  * base/
- *   outside.png                      outside every vault scope
- *   TechVault/                       Obsidian vault (.obsidian) — scope of the main root
- *     Attachments/                   vault-level attachments used by Documentation/ canvases and notes
- *     Documentation/                 DOCS_PATH (main root), with .trash, .rbcf, empty and txt-only folders
- *   LegendaryEpics/                  LE_DOCS_PATH, outer vault with two nested inner vaults
- *     IP Management/Lamaryah WorldBuilding/     inner vault, Amira Board.canvas uses inner-vault paths
- *     Projects/Development/Project SwordBreak/  inner vault, Amira.md uses outer-vault paths, '#name.jpg'
+ *   outside.png                      outside the vault scope
+ *   Vault/                           Obsidian vault (.obsidian): DOCS_VAULT_PATH, the scope of every section
+ *     Attachments/                   vault-level attachments used by notes and canvases in every section
+ *     Welcome.md                     vault root, outside every section
+ *     Home and Family/               open section, with .trash, .rbcf, empty and txt-only folders
+ *     LLCs/                          admin-only section
+ *       LegendaryEpics/              former vault with two nested former vaults (leftover .obsidian folders)
+ *         IP Management/Lamaryah WorldBuilding/     Amira Board.canvas uses inner-folder paths
+ *         Projects/Development/Project SwordBreak/  Amira.md uses outer-folder paths, '#name.jpg'
+ *     Dylan Personal/                admin-only section, with an image that an open note also embeds
  * </pre>
- * Duplicate base names: {@code shared.png} (Tech), {@code icon.png} and {@code Daken.md} (LE).
+ * Duplicate base names: {@code shared.png} (Attachments and Home), {@code icon.png} and {@code Daken.md} (LLCs).
  */
 public final class DocsFixture {
 
@@ -53,20 +57,31 @@ public final class DocsFixture {
     /** Café in NFD, as a macOS client might write it in a link. */
     public static final String CAFE_NFD = "Café.png";
 
+    /** Open section: shown to every signed-in user. */
+    public static final String HOME = "Home and Family";
+    /** Admin-only section holding the former LegendaryEpics vault. */
+    public static final String LLCS = "LLCs";
+    /** Admin-only section. */
+    public static final String PERSONAL = "Dylan Personal";
+
     public final Path base;
-    public final Path techVault;
-    public final Path docs;
+    public final Path vault;
+    public final Path home;
+    public final Path llcs;
     public final Path le;
     public final Path lamaryah;
     public final Path swordBreak;
+    public final Path personal;
 
     private DocsFixture(Path base) {
         this.base = base;
-        this.techVault = base.resolve("TechVault");
-        this.docs = techVault.resolve("Documentation");
-        this.le = base.resolve("LegendaryEpics");
+        this.vault = base.resolve("Vault");
+        this.home = vault.resolve(HOME);
+        this.llcs = vault.resolve(LLCS);
+        this.le = llcs.resolve("LegendaryEpics");
         this.lamaryah = le.resolve("IP Management/Lamaryah WorldBuilding");
         this.swordBreak = le.resolve("Projects/Development/Project SwordBreak");
+        this.personal = vault.resolve(PERSONAL);
     }
 
     /** Creates the fixture under {@code base}. */
@@ -76,27 +91,38 @@ public final class DocsFixture {
         return f;
     }
 
+    /** The production layout: "Home and Family" open, "Dylan Personal" and "LLCs" admin-only. */
+    public DocsRoots roots() {
+        return new DocsRoots(vault.toString(), List.of(HOME), List.of(PERSONAL, LLCS));
+    }
+
+    /** Tree path of a file in the open section, e.g. {@code h("Home/Basement.md")}. */
+    public static String h(String rest) {
+        return HOME + "/" + rest;
+    }
+
     private void write() throws IOException {
         bytes(base.resolve("outside.png"), PNG_BYTES);
 
-        // --- Tech vault: vault-level Attachments, Documentation/ is DOCS_PATH ---
-        text(techVault.resolve(".obsidian/app.json"), "{}");
-        bytes(techVault.resolve(".obsidian/secret.png"), PNG_BYTES);
-        bytes(techVault.resolve("Attachments/server.png"), PNG_BYTES);
-        bytes(techVault.resolve("Attachments/shared.png"), PNG_BYTES);
-        bytes(techVault.resolve("Attachments/unreferenced.png"), PNG_BYTES);
-        bytes(techVault.resolve("Attachments/My Pic.png"), PNG_BYTES);
-        bytes(techVault.resolve("Attachments/" + CAFE_NFC), PNG_BYTES);
-        text(techVault.resolve("Attachments/logo.svg"), SVG_TEXT);
-        text(techVault.resolve("Welcome.md"), "# Outside Documentation\n");
+        // --- Vault: .obsidian, vault-level Attachments, a note outside every section ---
+        text(vault.resolve(".obsidian/app.json"), "{}");
+        bytes(vault.resolve(".obsidian/secret.png"), PNG_BYTES);
+        bytes(vault.resolve("Attachments/server.png"), PNG_BYTES);
+        bytes(vault.resolve("Attachments/shared.png"), PNG_BYTES);
+        bytes(vault.resolve("Attachments/unreferenced.png"), PNG_BYTES);
+        bytes(vault.resolve("Attachments/My Pic.png"), PNG_BYTES);
+        bytes(vault.resolve("Attachments/" + CAFE_NFC), PNG_BYTES);
+        text(vault.resolve("Attachments/logo.svg"), SVG_TEXT);
+        text(vault.resolve("Welcome.md"), "# Outside every section\n");
 
-        text(docs.resolve("Alpha.md"), "# Alpha\n");
-        text(docs.resolve("zeta.md"), "![](../../outside.png)\n");
-        text(docs.resolve("README.txt"), "not listed\n");
-        text(docs.resolve(".trash/x.md"), "# trashed\n");
-        bytes(docs.resolve(".trash/trashed.png"), PNG_BYTES);
+        // --- Home and Family: open section ---
+        text(home.resolve("Alpha.md"), "# Alpha\n");
+        text(home.resolve("zeta.md"), "![](../../outside.png)\n");
+        text(home.resolve("README.txt"), "not listed\n");
+        text(home.resolve(".trash/x.md"), "# trashed\n");
+        bytes(home.resolve(".trash/trashed.png"), PNG_BYTES);
 
-        text(docs.resolve("Home/Basement.md"), String.join("\n",
+        text(home.resolve("Home/Basement.md"), String.join("\n",
                 "# Basement",
                 "![[Screenshot 1.png]]",
                 "![[shared.png]]",
@@ -107,27 +133,33 @@ public final class DocsFixture {
                 "![](../.trash/trashed.png)",
                 "![[Alpha.md]]",
                 "![[logo.svg|200]]",
+                "![[private.png]]",
+                "![](../../Dylan%20Personal/Accounts/private.png)",
                 ""));
-        bytes(docs.resolve("Home/Screenshot 1.png"), PNG_BYTES);
-        bytes(docs.resolve("Home/shared.png"), PNG_BYTES);
-        text(docs.resolve("Home/Network/Network Diagram.canvas"), """
+        bytes(home.resolve("Home/Screenshot 1.png"), PNG_BYTES);
+        bytes(home.resolve("Home/shared.png"), PNG_BYTES);
+        text(home.resolve("Home/Network/Network Diagram.canvas"), """
                 {"nodes":[
                   {"id":"a","type":"file","file":"Attachments/server.png","x":0,"y":0,"width":100,"height":100},
                   {"id":"b","type":"text","text":"Router ![[shared.png]]","x":200,"y":0,"width":100,"height":100},
                   {"id":"c","type":"file","file":"Attachments/logo.svg","x":400,"y":0,"width":100,"height":100}
                 ],"edges":[{"id":"e","fromNode":"a","toNode":"b"}]}
                 """);
-        Files.createDirectories(docs.resolve("Home/empty-folder"));
-        text(docs.resolve("Home/only-txt/notes.txt"), "txt only\n");
+        Files.createDirectories(home.resolve("Home/empty-folder"));
+        text(home.resolve("Home/only-txt/notes.txt"), "txt only\n");
 
-        text(docs.resolve("Insurance/Insurance Overview.md"), "# Insurance\n");
-        bytes(docs.resolve("Insurance/Car Insurance/ID Card.pdf"), PDF_BYTES);
+        text(home.resolve("Insurance/Insurance Overview.md"), "# Insurance\n");
+        bytes(home.resolve("Insurance/Car Insurance/ID Card.pdf"), PDF_BYTES);
 
-        bytes(docs.resolve("Sprinklers/Pratt_Tessa_Rainbird.rbcf"), new byte[] {1, 2, 3});
-        bytes(docs.resolve("Sprinklers/HowToGuide.pdf"), PDF_BYTES);
-        text(docs.resolve("Sprinklers/Rainbird.md"), "# Rainbird\n");
+        bytes(home.resolve("Sprinklers/Pratt_Tessa_Rainbird.rbcf"), new byte[] {1, 2, 3});
+        bytes(home.resolve("Sprinklers/HowToGuide.pdf"), PDF_BYTES);
+        text(home.resolve("Sprinklers/Rainbird.md"), "# Rainbird\n");
 
-        // --- LegendaryEpics: outer vault with nested inner vaults ---
+        // --- Dylan Personal: admin-only section ---
+        text(personal.resolve("Accounts/Accounts.md"), "# Accounts\n![[private.png]]\n");
+        bytes(personal.resolve("Accounts/private.png"), PNG_BYTES);
+
+        // --- LLCs/LegendaryEpics: former vault with nested former vaults (admin-only section) ---
         text(le.resolve(".obsidian/app.json"), "{}");
         text(le.resolve("Amira Artwork.md"), "");
 
@@ -161,13 +193,16 @@ public final class DocsFixture {
         text(swordBreak.resolve("Worldbuilding/Characters/Main Characters/Daken/Daken.md"), "# Daken (SwordBreak)\n");
     }
 
-    /** Tree path of the SwordBreak Amira note inside the "LE Docs" root. */
-    public static final String LE_AMIRA_NOTE =
-            "LE Docs/Projects/Development/Project SwordBreak/Worldbuilding/Characters/Main Characters/Amira/Amira.md";
+    /** Tree path prefix of the former LegendaryEpics vault inside the "LLCs" section. */
+    public static final String LE = LLCS + "/LegendaryEpics";
 
-    /** Tree path of the Amira Board canvas inside the "LE Docs" root. */
+    /** Tree path of the SwordBreak Amira note. */
+    public static final String LE_AMIRA_NOTE =
+            LE + "/Projects/Development/Project SwordBreak/Worldbuilding/Characters/Main Characters/Amira/Amira.md";
+
+    /** Tree path of the Amira Board canvas. */
     public static final String LE_AMIRA_BOARD =
-            "LE Docs/IP Management/Lamaryah WorldBuilding/Characters/Amira/Amira Board.canvas";
+            LE + "/IP Management/Lamaryah WorldBuilding/Characters/Amira/Amira Board.canvas";
 
     public static void text(Path file, String content) throws IOException {
         Files.createDirectories(file.getParent());

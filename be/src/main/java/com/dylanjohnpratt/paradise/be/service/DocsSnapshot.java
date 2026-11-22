@@ -27,7 +27,7 @@ public record DocsSnapshot(
         return new DocsSnapshot(new DocsTreeNode("", "folder", "", List.of(), null), List.of(), Map.of());
     }
 
-    /** Finds the active root with the given label ("" for the main root). */
+    /** Finds the active section with the given label. */
     public Optional<ActiveRoot> root(String label) {
         return roots.stream().filter(r -> r.label().equals(label)).findFirst();
     }
